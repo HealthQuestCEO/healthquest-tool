@@ -1,0 +1,709 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthQuest Workout Builder</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-page-break { page-break-after: always; }
+            body { background: white !important; }
+            .print-header { display: block !important; }
+            
+            /* Ensure proper printing */
+            * {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+            
+            /* Page formatting */
+            @page {
+                margin: 1cm;
+                size: letter;
+            }
+            
+            /* Ensure backgrounds print */
+            .bg-blue-50, .bg-green-50, .bg-yellow-50, .bg-red-50, .bg-purple-50 {
+                -webkit-print-color-adjust: exact !important;
+                print-color-adjust: exact !important;
+            }
+        }
+    </style>
+</head>
+<body style="background: linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%); min-height: 100vh;">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // Evidence-based exercise database
+        const EXERCISE_DATABASE = {
+            // Ages 5-8: Play-based, fundamental movements
+            'ages5-8': {
+                strength: [
+                    {
+                        name: "Animal Walks",
+                        description: "Bear crawl, crab walk, frog jump across room",
+                        duration: "3 sets of 30 seconds each",
+                        benefits: "Builds core strength, coordination",
+                        safety: "Use soft surface, supervise",
+                        evidence: "CDC - Fundamental Movement Skills"
+                    },
+                    {
+                        name: "Superhero Training",
+                        description: "Jump like Superman, balance like Wonder Woman (one leg), push like Hulk (wall pushes)",
+                        duration: "5 minutes, rotate activities",
+                        benefits: "Full body strength, imagination",
+                        safety: "Clear space, adult supervision",
+                        evidence: "AAP - Play-based Physical Activity"
+                    },
+                    {
+                        name: "Ball Rolling & Catching",
+                        description: "Roll large ball back and forth, practice catching",
+                        duration: "10 minutes",
+                        benefits: "Hand-eye coordination, core engagement",
+                        safety: "Use soft ball",
+                        evidence: "SHAPE America - Youth Guidelines"
+                    }
+                ],
+                cardio: [
+                    {
+                        name: "Musical Movement",
+                        description: "Dance when music plays, freeze when it stops",
+                        duration: "10-15 minutes",
+                        benefits: "Cardiovascular health, listening skills",
+                        safety: "Clear space of obstacles",
+                        evidence: "WHO - Physical Activity for Ages 5-17"
+                    },
+                    {
+                        name: "Treasure Hunt",
+                        description: "Hide objects around yard/house, race to find them",
+                        duration: "15-20 minutes",
+                        benefits: "Running, cardiovascular endurance",
+                        safety: "Safe outdoor space or clear indoor area",
+                        evidence: "CDC - Active Play Guidelines"
+                    },
+                    {
+                        name: "Follow the Leader",
+                        description: "Take turns being leader, copy movements (jumping, hopping, skipping)",
+                        duration: "10 minutes",
+                        benefits: "Variety of movements, social skills",
+                        safety: "Age-appropriate movements only",
+                        evidence: "AAP - Active Play Recommendations"
+                    }
+                ]
+            },
+            // Ages 9-12: Skill development, structured activities
+            'ages9-12': {
+                strength: [
+                    {
+                        name: "Bodyweight Circuit",
+                        description: "Squats (10), modified push-ups (8), plank (20 sec), lunges (5 each leg)",
+                        duration: "3 rounds, 1 min rest between",
+                        benefits: "Builds foundational strength, proper form",
+                        safety: "Demonstrate proper form first, no weights",
+                        evidence: "NSCA - Youth Resistance Training"
+                    },
+                    {
+                        name: "Core Challenge",
+                        description: "Plank (30 sec), bird dog (10 each side), bicycle crunches (20 total)",
+                        duration: "2-3 rounds",
+                        benefits: "Core stability, posture",
+                        safety: "Focus on form over speed",
+                        evidence: "ACSM - Youth Exercise Guidelines"
+                    },
+                    {
+                        name: "Sports Skills Practice",
+                        description: "Throwing accuracy drills, kicking practice, catching repetitions",
+                        duration: "20 minutes",
+                        benefits: "Sport-specific strength, coordination",
+                        safety: "Use appropriate equipment for age",
+                        evidence: "USA Youth Sports - Skill Development"
+                    }
+                ],
+                cardio: [
+                    {
+                        name: "Interval Running",
+                        description: "Jog 2 min, sprint 30 sec, walk 1 min. Repeat 5 times",
+                        duration: "20 minutes total",
+                        benefits: "Cardiovascular fitness, endurance",
+                        safety: "Proper warm-up, cool-down required",
+                        evidence: "CDC - Physical Activity Guidelines"
+                    },
+                    {
+                        name: "Active Games",
+                        description: "Tag, capture the flag, soccer keep-away",
+                        duration: "30 minutes",
+                        benefits: "Sustained moderate activity, fun factor",
+                        safety: "Appropriate space, rules explained",
+                        evidence: "WHO - 60 Minutes Daily Activity"
+                    },
+                    {
+                        name: "Jump Rope Challenge",
+                        description: "30 jumps, rest 30 sec, increase by 5 each round",
+                        duration: "10 minutes",
+                        benefits: "Coordination, cardiovascular health",
+                        safety: "Proper footwear, flat surface",
+                        evidence: "SHAPE America - Youth Fitness"
+                    }
+                ]
+            },
+            // Ages 13-18: Progressive training, sport-specific
+            'ages13-18': {
+                strength: [
+                    {
+                        name: "Progressive Bodyweight Training",
+                        description: "Push-ups (15), squats (20), lunges (12 each), plank (45 sec), step-ups (15 each)",
+                        duration: "3-4 rounds, 90 sec rest",
+                        benefits: "Functional strength, muscle endurance",
+                        safety: "Progress gradually, maintain form",
+                        evidence: "NSCA - Teen Strength Training"
+                    },
+                    {
+                        name: "Resistance Band Circuit",
+                        description: "Band rows (15), band presses (12), band squats (15), band curls (12)",
+                        duration: "3 rounds",
+                        benefits: "Resistance training, joint-friendly",
+                        safety: "Check band integrity, control movements",
+                        evidence: "ACSM - Adolescent Resistance Training"
+                    },
+                    {
+                        name: "Core & Balance",
+                        description: "Single-leg deadlift (10 each), side plank (30 sec each), Russian twists (20), stability ball plank (30 sec)",
+                        duration: "2-3 rounds",
+                        benefits: "Balance, core strength, injury prevention",
+                        safety: "Use wall for balance support if needed",
+                        evidence: "NATA - Injury Prevention Guidelines"
+                    }
+                ],
+                cardio: [
+                    {
+                        name: "HIIT Workout",
+                        description: "30 sec high knees, 30 sec mountain climbers, 30 sec burpees, 30 sec rest. Repeat 8 rounds",
+                        duration: "20 minutes",
+                        benefits: "Cardiovascular fitness, time-efficient",
+                        safety: "Warm-up essential, modify intensity as needed",
+                        evidence: "ACSM - HIIT for Adolescents"
+                    },
+                    {
+                        name: "Sport-Specific Cardio",
+                        description: "Basketball drills, soccer conditioning, swimming laps, track intervals",
+                        duration: "30-45 minutes",
+                        benefits: "Sport preparation, sustained effort",
+                        safety: "Sport-specific equipment, proper technique",
+                        evidence: "USA Sports Medicine - Teen Athletes"
+                    },
+                    {
+                        name: "Steady-State Run",
+                        description: "Maintain comfortable pace for duration, should be able to talk",
+                        duration: "20-30 minutes",
+                        benefits: "Aerobic capacity, endurance base",
+                        safety: "Proper footwear, hydration",
+                        evidence: "CDC - Aerobic Activity Recommendations"
+                    }
+                ]
+            }
+        };
+
+        function WorkoutBuilder() {
+            const [view, setView] = useState('form'); // form, plan
+            const [clientData, setClientData] = useState({
+                age: '',
+                interests: [],
+                barriers: [],
+                limitations: [],
+                activityLevel: '',
+                goals: []
+            });
+            const [workoutPlan, setWorkoutPlan] = useState(null);
+
+            const generateWorkoutPlan = () => {
+                // Determine age group
+                const age = parseInt(clientData.age);
+                let ageGroup;
+                if (age <= 8) ageGroup = 'ages5-8';
+                else if (age <= 12) ageGroup = 'ages9-12';
+                else ageGroup = 'ages13-18';
+
+                // Get exercises from database
+                const exercises = EXERCISE_DATABASE[ageGroup];
+                
+                // Select exercises based on goals and limitations
+                let selectedStrength = [...exercises.strength];
+                let selectedCardio = [...exercises.cardio];
+
+                // Modify based on limitations
+                if (clientData.limitations.includes('joint-issues')) {
+                    // Remove high-impact exercises
+                    selectedCardio = selectedCardio.filter(ex => 
+                        !ex.name.toLowerCase().includes('jump') && 
+                        !ex.name.toLowerCase().includes('running')
+                    );
+                }
+
+                if (clientData.limitations.includes('low-energy')) {
+                    // Start with easier variations
+                    selectedStrength = selectedStrength.slice(0, 2);
+                    selectedCardio = selectedCardio.slice(0, 2);
+                }
+
+                // Create 12-week progression
+                const weeks = [];
+                for (let week = 1; week <= 12; week++) {
+                    let phase;
+                    let focus;
+                    if (week <= 4) {
+                        phase = 1;
+                        focus = "Foundation Phase - Building habits and basic fitness";
+                    } else if (week <= 8) {
+                        phase = 2;
+                        focus = "Development Phase - Increasing intensity and variety";
+                    } else {
+                        phase = 3;
+                        focus = "Strength Phase - Maximizing gains and confidence";
+                    }
+
+                    weeks.push({
+                        week: week,
+                        phase: phase,
+                        focus: focus,
+                        strengthExercises: selectedStrength,
+                        cardioExercises: selectedCardio,
+                        frequency: clientData.activityLevel === 'beginner' ? 3 : clientData.activityLevel === 'intermediate' ? 4 : 5
+                    });
+                }
+
+                setWorkoutPlan({
+                    ageGroup: ageGroup,
+                    weeks: weeks,
+                    guidelines: getGuidelines(ageGroup)
+                });
+
+                setView('plan');
+            };
+
+            const getGuidelines = (ageGroup) => {
+                const guidelines = {
+                    'ages5-8': {
+                        duration: "60 minutes daily of active play",
+                        intensity: "Mostly moderate intensity, short bursts of vigorous",
+                        frequency: "Daily activity encouraged",
+                        safety: "Adult supervision required, focus on fun",
+                        source: "CDC & AAP Guidelines for Ages 5-8"
+                    },
+                    'ages9-12': {
+                        duration: "60 minutes daily of moderate-to-vigorous activity",
+                        intensity: "Mix of moderate (can talk) and vigorous (breathing hard)",
+                        frequency: "3+ days strength, daily aerobic",
+                        safety: "Proper warm-up/cool-down, hydration",
+                        source: "CDC Physical Activity Guidelines for Children"
+                    },
+                    'ages13-18': {
+                        duration: "60 minutes daily of moderate-to-vigorous activity",
+                        intensity: "Include vigorous intensity 3+ days/week",
+                        frequency: "3+ days strength, daily aerobic",
+                        safety: "Progressive overload, rest days important",
+                        source: "CDC & ACSM Guidelines for Adolescents"
+                    }
+                };
+                return guidelines[ageGroup];
+            };
+
+            const FormView = () => (
+                <div className="min-h-screen py-8 px-4">
+                    <div className="max-w-3xl mx-auto">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8">
+                            <div className="text-center mb-8">
+                                <h1 className="text-4xl font-bold mb-2" style={{color: '#00A3E0'}}>
+                                    🏋️ HealthQuest Workout Builder
+                                </h1>
+                                <p className="text-gray-600">
+                                    Evidence-based exercise plans for youth wellness
+                                </p>
+                            </div>
+
+                            <div className="space-y-6">
+                                {/* Age */}
+                                <div>
+                                    <label className="block font-bold text-gray-800 mb-2">
+                                        Age
+                                    </label>
+                                    <input
+                                        type="number"
+                                        value={clientData.age}
+                                        onChange={(e) => setClientData({...clientData, age: e.target.value})}
+                                        className="w-full p-3 border-2 rounded-xl"
+                                        placeholder="Enter age (5-18)"
+                                        min="5"
+                                        max="18"
+                                    />
+                                </div>
+
+                                {/* Activity Level */}
+                                <div>
+                                    <label className="block font-bold text-gray-800 mb-2">
+                                        Current Activity Level
+                                    </label>
+                                    <select
+                                        value={clientData.activityLevel}
+                                        onChange={(e) => setClientData({...clientData, activityLevel: e.target.value})}
+                                        className="w-full p-3 border-2 rounded-xl"
+                                    >
+                                        <option value="">Select level...</option>
+                                        <option value="beginner">Beginner (Little to no regular activity)</option>
+                                        <option value="intermediate">Intermediate (Some regular activity)</option>
+                                        <option value="active">Active (Regular activity most days)</option>
+                                    </select>
+                                </div>
+
+                                {/* Interests */}
+                                <div>
+                                    <label className="block font-bold text-gray-800 mb-2">
+                                        Interests (select all that apply)
+                                    </label>
+                                    <div className="grid grid-cols-2 gap-3">
+                                        {['Sports', 'Dancing', 'Outdoor Play', 'Team Games', 'Solo Activities', 'Strength Training'].map(interest => (
+                                            <label key={interest} className="flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer hover:bg-blue-50">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={clientData.interests.includes(interest)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setClientData({...clientData, interests: [...clientData.interests, interest]});
+                                                        } else {
+                                                            setClientData({...clientData, interests: clientData.interests.filter(i => i !== interest)});
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{interest}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Physical Limitations */}
+                                <div>
+                                    <label className="block font-bold text-gray-800 mb-2">
+                                        Physical Limitations or Barriers
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            {id: 'joint-issues', label: 'Joint pain or issues (knees, ankles)'},
+                                            {id: 'low-energy', label: 'Low energy or fatigue'},
+                                            {id: 'asthma', label: 'Asthma or breathing concerns'},
+                                            {id: 'balance', label: 'Balance or coordination challenges'},
+                                            {id: 'motivation', label: 'Low motivation or confidence'}
+                                        ].map(limitation => (
+                                            <label key={limitation.id} className="flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer hover:bg-yellow-50">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={clientData.limitations.includes(limitation.id)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setClientData({...clientData, limitations: [...clientData.limitations, limitation.id]});
+                                                        } else {
+                                                            setClientData({...clientData, limitations: clientData.limitations.filter(l => l !== limitation.id)});
+                                                        }
+                                                    }}
+                                                />
+                                                <span className="text-sm">{limitation.label}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Goals */}
+                                <div>
+                                    <label className="block font-bold text-gray-800 mb-2">
+                                        Fitness Goals
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            'Build strength',
+                                            'Improve cardiovascular fitness',
+                                            'Increase energy',
+                                            'Gain confidence',
+                                            'Prepare for sports',
+                                            'Have fun with movement'
+                                        ].map(goal => (
+                                            <label key={goal} className="flex items-center space-x-2 p-3 border-2 rounded-xl cursor-pointer hover:bg-green-50">
+                                                <input
+                                                    type="checkbox"
+                                                    checked={clientData.goals.includes(goal)}
+                                                    onChange={(e) => {
+                                                        if (e.target.checked) {
+                                                            setClientData({...clientData, goals: [...clientData.goals, goal]});
+                                                        } else {
+                                                            setClientData({...clientData, goals: clientData.goals.filter(g => g !== goal)});
+                                                        }
+                                                    }}
+                                                />
+                                                <span>{goal}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Generate Button */}
+                                <button
+                                    onClick={generateWorkoutPlan}
+                                    disabled={!clientData.age || !clientData.activityLevel}
+                                    className="w-full py-4 rounded-xl font-bold text-white text-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                                    style={{background: 'linear-gradient(135deg, #00A3E0 0%, #0077B3 100%)'}}
+                                >
+                                    🏋️ Generate Workout Plan
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const PlanView = () => (
+                <div className="min-h-screen py-8 px-4">
+                    <div className="max-w-6xl mx-auto">
+                        {/* Header - No Print */}
+                        <div className="bg-white rounded-3xl shadow-2xl p-8 mb-8 no-print">
+                            <div className="flex items-center justify-between mb-4">
+                                <div>
+                                    <h1 className="text-3xl font-bold" style={{color: '#00A3E0'}}>
+                                        🏋️ 12-Week Workout Plan
+                                    </h1>
+                                    <p className="text-gray-600 mt-2">
+                                        Age: {clientData.age} | Level: {clientData.activityLevel}
+                                    </p>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button
+                                        onClick={() => window.print()}
+                                        className="px-8 py-4 rounded-xl font-bold text-white text-lg shadow-lg hover:shadow-xl transition"
+                                        style={{background: 'linear-gradient(135deg, #7AC943 0%, #5FA32E 100%)'}}
+                                    >
+                                        🖨️ Print Workout Plan
+                                    </button>
+                                    <button
+                                        onClick={() => {
+                                            const newWindow = window.open('', '_blank');
+                                            newWindow.document.write(`
+                                                <html>
+                                                <head><title>HealthQuest Workout Plan</title></head>
+                                                <body>${document.querySelector('.max-w-6xl').innerHTML}</body>
+                                                </html>
+                                            `);
+                                            newWindow.document.close();
+                                            newWindow.print();
+                                        }}
+                                        className="px-6 py-4 rounded-xl font-bold text-white shadow-lg hover:shadow-xl transition"
+                                        style={{background: 'linear-gradient(135deg, #00A3E0 0%, #0077B3 100%)'}}
+                                    >
+                                        📄 Print Preview
+                                    </button>
+                                    <button
+                                        onClick={() => setView('form')}
+                                        className="px-6 py-4 rounded-xl font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 transition"
+                                    >
+                                        ← New Plan
+                                    </button>
+                                </div>
+                            </div>
+                            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+                                <p className="text-sm text-gray-700">
+                                    <strong>💡 Printing Tip:</strong> Click "Print Workout Plan" to give this complete 12-week plan to your client. 
+                                    It includes all exercises, safety guidelines, progress tracker, and evidence sources.
+                                </p>
+                            </div>
+                        </div>
+
+                        {/* Print Header - Only Shows on Print */}
+                        <div className="print-header" style={{display: 'none'}}>
+                            <div style={{textAlign: 'center', borderBottom: '3px solid #00A3E0', paddingBottom: '20px', marginBottom: '30px'}}>
+                                <h1 style={{fontSize: '36px', fontWeight: 'bold', color: '#00A3E0', margin: '0'}}>
+                                    🏋️ HealthQuest 12-Week Workout Plan
+                                </h1>
+                                <p style={{fontSize: '18px', color: '#666', marginTop: '10px'}}>
+                                    Age: {clientData.age} years | Activity Level: {clientData.activityLevel.charAt(0).toUpperCase() + clientData.activityLevel.slice(1)}
+                                </p>
+                                <p style={{fontSize: '14px', color: '#999', marginTop: '5px'}}>
+                                    Generated: {new Date().toLocaleDateString()}
+                                </p>
+                            </div>
+                        </div>
+
+                        <style dangerouslySetInnerHTML={{__html: `
+                            @media print {
+                                .print-header {
+                                    display: block !important;
+                                }
+                            }
+                        `}} />
+
+                        {/* Guidelines */}
+                        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                            <h2 className="text-2xl font-bold mb-4" style={{color: '#00A3E0'}}>
+                                📋 Evidence-Based Guidelines
+                            </h2>
+                            <div className="grid md:grid-cols-2 gap-4">
+                                <div className="p-4 bg-blue-50 rounded-xl">
+                                    <p className="font-bold text-gray-800 mb-2">⏱️ Duration</p>
+                                    <p className="text-sm text-gray-700">{workoutPlan.guidelines.duration}</p>
+                                </div>
+                                <div className="p-4 bg-green-50 rounded-xl">
+                                    <p className="font-bold text-gray-800 mb-2">💪 Intensity</p>
+                                    <p className="text-sm text-gray-700">{workoutPlan.guidelines.intensity}</p>
+                                </div>
+                                <div className="p-4 bg-yellow-50 rounded-xl">
+                                    <p className="font-bold text-gray-800 mb-2">📅 Frequency</p>
+                                    <p className="text-sm text-gray-700">{workoutPlan.guidelines.frequency}</p>
+                                </div>
+                                <div className="p-4 bg-red-50 rounded-xl">
+                                    <p className="font-bold text-gray-800 mb-2">⚠️ Safety</p>
+                                    <p className="text-sm text-gray-700">{workoutPlan.guidelines.safety}</p>
+                                </div>
+                            </div>
+                            <p className="text-xs text-gray-500 mt-4">
+                                <strong>Source:</strong> {workoutPlan.guidelines.source}
+                            </p>
+                        </div>
+
+                        {/* Weekly Plans */}
+                        {[1, 2, 3].map(phase => {
+                            const phaseWeeks = workoutPlan.weeks.filter(w => w.phase === phase);
+                            return (
+                                <div key={phase} className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                                    <div className="border-b-4 pb-4 mb-6" style={{borderColor: phase === 1 ? '#00A3E0' : phase === 2 ? '#7AC943' : '#F39C12'}}>
+                                        <h2 className="text-2xl font-bold" style={{color: phase === 1 ? '#00A3E0' : phase === 2 ? '#7AC943' : '#F39C12'}}>
+                                            Phase {phase}: Weeks {phaseWeeks[0].week}-{phaseWeeks[phaseWeeks.length - 1].week}
+                                        </h2>
+                                        <p className="text-gray-700 mt-2">{phaseWeeks[0].focus}</p>
+                                        <p className="text-sm text-gray-600 mt-1">
+                                            <strong>Frequency:</strong> {phaseWeeks[0].frequency} days per week
+                                        </p>
+                                    </div>
+
+                                    {/* Strength Exercises */}
+                                    <div className="mb-6">
+                                        <h3 className="text-xl font-bold mb-4 flex items-center">
+                                            <span style={{fontSize: '24px', marginRight: '10px'}}>💪</span>
+                                            Strength Exercises
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {phaseWeeks[0].strengthExercises.map((exercise, idx) => (
+                                                <div key={idx} className="border-2 rounded-xl p-4 hover:bg-blue-50 transition">
+                                                    <h4 className="font-bold text-lg text-gray-800 mb-2">
+                                                        {exercise.name}
+                                                    </h4>
+                                                    <p className="text-gray-700 mb-2">{exercise.description}</p>
+                                                    <div className="grid md:grid-cols-2 gap-2 text-sm">
+                                                        <p><strong>Duration:</strong> {exercise.duration}</p>
+                                                        <p><strong>Benefits:</strong> {exercise.benefits}</p>
+                                                        <p className="text-yellow-700"><strong>⚠️ Safety:</strong> {exercise.safety}</p>
+                                                        <p className="text-blue-600 text-xs"><strong>Evidence:</strong> {exercise.evidence}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    {/* Cardio Exercises */}
+                                    <div>
+                                        <h3 className="text-xl font-bold mb-4 flex items-center">
+                                            <span style={{fontSize: '24px', marginRight: '10px'}}>🏃</span>
+                                            Cardiovascular Exercises
+                                        </h3>
+                                        <div className="space-y-4">
+                                            {phaseWeeks[0].cardioExercises.map((exercise, idx) => (
+                                                <div key={idx} className="border-2 rounded-xl p-4 hover:bg-green-50 transition">
+                                                    <h4 className="font-bold text-lg text-gray-800 mb-2">
+                                                        {exercise.name}
+                                                    </h4>
+                                                    <p className="text-gray-700 mb-2">{exercise.description}</p>
+                                                    <div className="grid md:grid-cols-2 gap-2 text-sm">
+                                                        <p><strong>Duration:</strong> {exercise.duration}</p>
+                                                        <p><strong>Benefits:</strong> {exercise.benefits}</p>
+                                                        <p className="text-yellow-700"><strong>⚠️ Safety:</strong> {exercise.safety}</p>
+                                                        <p className="text-blue-600 text-xs"><strong>Evidence:</strong> {exercise.evidence}</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+
+                                    <div className="mt-6 p-4 bg-purple-50 rounded-xl border-2 border-purple-300">
+                                        <p className="text-sm text-gray-700">
+                                            <strong>💡 Pro Tip:</strong> Mix and match exercises each week to keep things fun! 
+                                            {phase === 1 && " Focus on learning proper form and building the habit."}
+                                            {phase === 2 && " Start challenging yourself a bit more - you've got this!"}
+                                            {phase === 3 && " You're in the final stretch! Notice how much stronger you feel!"}
+                                        </p>
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {/* Progress Tracker */}
+                        <div className="bg-white rounded-2xl shadow-lg p-6 mb-8">
+                            <h2 className="text-2xl font-bold mb-4" style={{color: '#00A3E0'}}>
+                                📊 12-Week Progress Tracker
+                            </h2>
+                            <div className="grid grid-cols-6 gap-2">
+                                {Array.from({length: 12}, (_, i) => i + 1).map(week => (
+                                    <div key={week} className="border-2 rounded-xl p-3 text-center">
+                                        <p className="font-bold text-gray-800">Week {week}</p>
+                                        <div className="mt-2 space-y-1">
+                                            {['M', 'T', 'W', 'Th', 'F'].map(day => (
+                                                <div key={day} className="flex items-center justify-center">
+                                                    <span className="text-xs text-gray-600 mr-2">{day}</span>
+                                                    <input type="checkbox" className="w-4 h-4" />
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        {/* Important Reminders */}
+                        <div className="bg-red-50 border-2 border-red-300 rounded-2xl p-6 mb-8">
+                            <h2 className="text-2xl font-bold mb-4 text-red-800">
+                                ⚠️ Important Safety Reminders
+                            </h2>
+                            <ul className="space-y-2 text-gray-800">
+                                <li>• <strong>Always warm up</strong> for 5 minutes before exercise (light jogging, arm circles)</li>
+                                <li>• <strong>Cool down</strong> for 5 minutes after exercise (walking, stretching)</li>
+                                <li>• <strong>Stop immediately</strong> if you feel pain (not soreness, but sharp pain)</li>
+                                <li>• <strong>Stay hydrated</strong> - drink water before, during, and after activity</li>
+                                <li>• <strong>Rest days matter</strong> - your body needs time to recover and grow stronger</li>
+                                <li>• <strong>Listen to your body</strong> - it's okay to modify exercises or take breaks</li>
+                                <li>• <strong>Progress gradually</strong> - don't increase intensity too quickly</li>
+                                {clientData.limitations.length > 0 && (
+                                    <li className="text-red-700 font-bold">• <strong>Note your limitations:</strong> Exercises have been modified for your needs. Consult healthcare provider if concerns arise.</li>
+                                )}
+                            </ul>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            return (
+                <div>
+                    {view === 'form' && <FormView />}
+                    {view === 'plan' && <PlanView />}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<WorkoutBuilder />, document.getElementById('root'));
+    </script>
+</body>
+</html>workout-builder-FINAL.html
