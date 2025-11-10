@@ -1,0 +1,1832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthQuest Wellness Coach - Provider Tool</title>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+        }
+        
+        /* HealthQuest Brand Colors */
+        :root {
+            --hq-primary: #00A3E0;
+            --hq-secondary: #7AC943;
+            --hq-accent: #FF6B6B;
+            --hq-purple: #9B59B6;
+            --hq-yellow: #F39C12;
+        }
+        
+        .hq-primary-btn {
+            background: linear-gradient(135deg, #00A3E0 0%, #0077B3 100%);
+        }
+        
+        .hq-secondary-btn {
+            background: linear-gradient(135deg, #7AC943 0%, #5FA32E 100%);
+        }
+        
+        .mountain-path {
+            stroke-dasharray: 5, 5;
+            animation: dash 20s linear infinite;
+        }
+        
+        @keyframes dash {
+            to {
+                stroke-dashoffset: -100;
+            }
+        }
+        
+        @media print {
+            .no-print { display: none !important; }
+            .print-page-break { page-break-after: always; }
+            body { background: white !important; }
+            .print-header { display: block !important; }
+        }
+        
+        .print-header {
+            display: none;
+        }
+    </style>
+</head>
+<body style="background: linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%); min-height: 100vh;">
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState } = React;
+
+        // ========================================
+        // EVIDENCE-BASED GUIDELINES & STANDARDS
+        // ========================================
+        
+        const EVIDENCE_BASED_GUIDELINES = {
+            physicalActivity: {
+                source: "CDC, AAP, WHO Physical Activity Guidelines",
+                recommendation: "60 minutes per day of moderate-to-vigorous activity for ages 5-17"
+            },
+            nutrition: {
+                source: "USDA MyPlate, Academy of Nutrition & Dietetics",
+                hungerScale: "Eat at 3-4, stop at 7-8"
+            },
+            mentalHealth: {
+                source: "AAP, NAMI, CDC Mental Health Guidelines",
+                strategies: ["4-4-4 breathing", "5-4-3-2-1 grounding", "Journaling"]
+            },
+            sleep: {
+                source: "AAP, National Sleep Foundation",
+                hours: {
+                    ages6to12: "9-12 hours",
+                    ages13to18: "8-10 hours"
+                }
+            }
+        };
+
+        function ProviderWellnessTool() {
+            const [view, setView] = useState('home'); // home, assessment, intake, plan
+            const [assessmentData, setAssessmentData] = useState({
+                q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0,
+                q7: 0, q8: 0, q9: 0, q10: 0, q11: 0, q12: 0,
+                clientBarrier: ''
+            });
+            const [barrierResults, setBarrierResults] = useState(null);
+            const [clientData, setClientData] = useState({
+                age: '',
+                goals: [],
+                interests: [],
+                timeAvailability: '',
+                activityStyles: [],
+                limitations: [],
+                barriers: [],
+                notes: ''
+            });
+            const [generatedPlan, setGeneratedPlan] = useState(null);
+
+            const calculateBarriers = () => {
+                const scores = assessmentData;
+                
+                // Calculate category averages (no weights)
+                const barriers = [
+                    {
+                        name: 'Mental Health Barriers',
+                        questions: [1, 9, 10],
+                        average: (scores.q1 + scores.q9 + scores.q10) / 3,
+                        goalMapping: 'emotional-regulation'
+                    },
+                    {
+                        name: 'Psychological Factors & Weight Management',
+                        questions: [1, 8, 9],
+                        average: (scores.q1 + scores.q8 + scores.q9) / 3,
+                        goalMapping: 'self-confidence'
+                    },
+                    {
+                        name: 'Nutrition & Mindful Eating',
+                        questions: [3, 6, 11],
+                        average: (scores.q3 + scores.q6 + scores.q11) / 3,
+                        goalMapping: 'mindful-eating'
+                    },
+                    {
+                        name: 'Physical Activity',
+                        questions: [2, 4, 9],
+                        average: (scores.q2 + scores.q4 + scores.q9) / 3,
+                        goalMapping: 'physical-fitness'
+                    },
+                    {
+                        name: 'Hope & Resilience',
+                        questions: [4, 9, 12],
+                        average: (scores.q4 + scores.q9 + scores.q12) / 3,
+                        goalMapping: 'self-confidence'
+                    },
+                    {
+                        name: 'Mindfulness & Psychological Factors',
+                        questions: [5, 9, 12],
+                        average: (scores.q5 + scores.q9 + scores.q12) / 3,
+                        goalMapping: 'anxiety-reduction'
+                    },
+                    {
+                        name: 'Intuitive Eating & Body Awareness',
+                        questions: [6, 8, 11],
+                        average: (scores.q6 + scores.q8 + scores.q11) / 3,
+                        goalMapping: 'mindful-eating'
+                    },
+                    {
+                        name: 'Anti-Bullying',
+                        questions: [7, 10],
+                        average: (scores.q7 + scores.q10) / 2,
+                        goalMapping: 'social-connection'
+                    }
+                ];
+                
+                // Sort by highest average (highest barrier)
+                barriers.sort((a, b) => b.average - a.average);
+                
+                // Auto-suggest top 3 goals based on barriers
+                const suggestedGoals = [];
+                barriers.slice(0, 3).forEach(barrier => {
+                    if (!suggestedGoals.includes(barrier.goalMapping)) {
+                        suggestedGoals.push(barrier.goalMapping);
+                    }
+                });
+                
+                // Always include self-confidence
+                if (!suggestedGoals.includes('self-confidence')) {
+                    suggestedGoals.push('self-confidence');
+                }
+                
+                setBarrierResults({
+                    barriers: barriers,
+                    topBarrier: barriers[0],
+                    suggestedGoals: suggestedGoals.slice(0, 3),
+                    clientPerception: assessmentData.clientBarrier
+                });
+                
+                // Auto-populate suggested goals in clientData
+                setClientData({
+                    ...clientData,
+                    goals: suggestedGoals.slice(0, 3),
+                    providerBarrier: '' // Will be filled in intake form
+                });
+                
+                setView('intake');
+            };
+
+            const handleCheckbox = (field, value) => {
+                const current = clientData[field] || [];
+                if (current.includes(value)) {
+                    setClientData({...clientData, [field]: current.filter(v => v !== value)});
+                } else {
+                    setClientData({...clientData, [field]: [...current, value]});
+                }
+            };
+
+            const generatePlan = () => {
+                const plan = {
+                    smartGoals: generateSMARTGoals(clientData),
+                    weeklyCalendar: generateWeeklyCalendar(clientData),
+                    nutritionChallenges: generateNutritionChallenges(clientData),
+                    emotionalActivities: generateEmotionalActivities(clientData),
+                    mountainTracker: generateMountainTracker(clientData),
+                    createdDate: new Date().toLocaleDateString()
+                };
+                
+                setGeneratedPlan(plan);
+                setView('plan');
+            };
+
+            const generateSMARTGoals = (data) => {
+                const goals = [];
+                const guidelines = EVIDENCE_BASED_GUIDELINES;
+                
+                // Self-Confidence (always include if selected)
+                if (data.goals.includes('self-confidence')) {
+                    goals.push({
+                        week: 2,
+                        category: 'Self-Confidence',
+                        icon: '⭐',
+                        specific: 'Complete 3 wellness activities and celebrate each one',
+                        measurable: '3 activities with self-celebration (high-five, happy dance, or journal entry)',
+                        achievable: 'Start with activities you enjoy most',
+                        relevant: 'Building confidence through small wins creates motivation for bigger challenges. Research shows celebrating progress builds self-efficacy.',
+                        timeBound: 'By end of Week 2',
+                        evidence: 'AAP Mental Health Guidelines - Self-Confidence Building'
+                    });
+                }
+                
+                // Physical Fitness
+                if (data.goals.includes('physical-fitness')) {
+                    goals.push({
+                        week: 4,
+                        category: 'Physical Fitness',
+                        icon: '💪',
+                        specific: `Complete ${data.activityStyles.includes('play-based') ? '6 play-based movement sessions' : '6 active sessions'}`,
+                        measurable: 'Check off each 20-30 minute session (working toward CDC recommendation of 60 min/day)',
+                        achievable: 'Start with 15 minutes if needed. Build gradually per AAP guidelines.',
+                        relevant: `Regular movement builds strength, energy, and confidence. ${guidelines.physicalActivity.recommendation}.`,
+                        timeBound: 'By end of Week 4',
+                        evidence: 'CDC Physical Activity Guidelines for Children & Adolescents'
+                    });
+                }
+                
+                // Mindful Eating
+                if (data.goals.includes('mindful-eating')) {
+                    goals.push({
+                        week: 6,
+                        category: 'Mindful Eating',
+                        icon: '🥗',
+                        specific: 'Practice mindful eating during 5 meals using the "5 Senses Check"',
+                        measurable: `Rate hunger before/after eating (${guidelines.nutrition.hungerScale}). Notice 3 things about food.`,
+                        achievable: 'Start with one meal per day. Eat without distractions.',
+                        relevant: 'Understanding body signals helps make choices that feel good. Mindful eating improves relationship with food.',
+                        timeBound: 'By end of Week 6',
+                        evidence: 'Academy of Nutrition & Dietetics - Mindful Eating Principles'
+                    });
+                }
+                
+                // Emotional Regulation
+                if (data.goals.includes('emotional-regulation')) {
+                    goals.push({
+                        week: 8,
+                        category: 'Emotional Wellness',
+                        icon: '😌',
+                        specific: 'Use 3 different calming strategies when feeling big emotions',
+                        measurable: 'Try evidence-based techniques: 4-4-4 breathing, journaling, or movement. Track which helps most.',
+                        achievable: 'Keep a simple emotion chart with 1-3 notes per day.',
+                        relevant: 'Managing feelings builds confidence and resilience. AAP recommends multiple coping tools.',
+                        timeBound: 'By end of Week 8',
+                        evidence: 'AAP & NAMI - Emotional Regulation Strategies for Youth'
+                    });
+                }
+                
+                // Anxiety Reduction
+                if (data.goals.includes('anxiety-reduction')) {
+                    goals.push({
+                        week: 10,
+                        category: 'Anxiety Management',
+                        icon: '🧘',
+                        specific: 'Practice 5-4-3-2-1 grounding technique daily for 2 weeks',
+                        measurable: 'Complete grounding exercise (5 see, 4 touch, 3 hear, 2 smell, 1 taste) and rate anxiety before/after (1-10)',
+                        achievable: 'Takes 2-3 minutes, can do anywhere. Evidence-based CBT strategy.',
+                        relevant: 'Having tools to calm anxiety gives control over tough moments. NAMI recommends grounding.',
+                        timeBound: 'By end of Week 10',
+                        evidence: 'NAMI & CDC - Evidence-Based Anxiety Reduction'
+                    });
+                }
+                
+                // Sleep Hygiene
+                if (data.goals.includes('sleep-hygiene')) {
+                    const ageGroup = parseInt(data.age) >= 13 ? 'ages13to18' : 'ages6to12';
+                    const recommendedHours = guidelines.sleep.hours[ageGroup];
+                    
+                    goals.push({
+                        week: 12,
+                        category: 'Sleep Wellness',
+                        icon: '😴',
+                        specific: 'Follow a calming bedtime routine 5 nights per week',
+                        measurable: `Track sleep/wake times and how rested you feel (1-5). Aim for ${recommendedHours} per night.`,
+                        achievable: 'Start with 2-3 steps: dim lights, no screens 30min before bed, deep breaths.',
+                        relevant: 'Better sleep improves mood, energy, and ability to handle challenges.',
+                        timeBound: 'By end of Week 12',
+                        evidence: 'AAP & National Sleep Foundation - Sleep Hygiene Guidelines'
+                    });
+                }
+                
+                // Social Connection
+                if (data.goals.includes('social-connection')) {
+                    goals.push({
+                        week: 10,
+                        category: 'Social Connection',
+                        icon: '🤝',
+                        specific: 'Reach out to connect with others 3 times per week',
+                        measurable: 'Count connections (text friend, join activity, help someone, family time)',
+                        achievable: 'Even small connections count - a smile, compliment, asking about someone\'s day.',
+                        relevant: 'Social connections boost happiness and confidence. CDC research shows they\'re vital for youth development.',
+                        timeBound: 'By end of Week 10',
+                        evidence: 'CDC & AAP - Social-Emotional Development Guidelines'
+                    });
+                }
+                
+                // Digestive Health
+                if (data.goals.includes('digestive-health')) {
+                    goals.push({
+                        week: 8,
+                        category: 'Digestive Health',
+                        icon: '🫧',
+                        specific: 'Increase fiber intake and track digestive comfort for 2 weeks',
+                        measurable: 'Add 2-3 high-fiber foods daily, note how tummy feels (1-5 scale)',
+                        achievable: 'Start with foods you like: fruits, veggies, whole grains, beans',
+                        relevant: 'Fiber and hydration support healthy digestion and regular bowel movements.',
+                        timeBound: 'By end of Week 8',
+                        evidence: 'NASPGHAN - Pediatric Digestive Health Guidelines'
+                    });
+                }
+                
+                // Fill to 6 goals with confidence boosters if needed
+                while (goals.length < 6) {
+                    const week = (goals.length + 1) * 2;
+                    goals.push({
+                        week: week,
+                        category: 'Self-Confidence',
+                        icon: '🌟',
+                        specific: 'Try 2 new wellness activities outside your comfort zone',
+                        measurable: 'Complete activities and write what you learned about yourself',
+                        achievable: 'Choose activities that feel slightly challenging but doable',
+                        relevant: 'Trying new things shows you\'re braver than you think',
+                        timeBound: `By end of Week ${week}`,
+                        evidence: 'Growth Mindset Research - Building Self-Efficacy'
+                    });
+                }
+                
+                return goals.slice(0, 6).sort((a, b) => a.week - b.week);
+            };
+
+            const generateWeeklyCalendar = (data) => {
+                const weeks = [];
+                const themes = [
+                    'Getting Started - Building Your Foundation',
+                    'Small Wins Add Up',
+                    'Finding Your Rhythm',
+                    'Confidence Boost - You\'re Amazing!',
+                    'Challenge Week - Try Something New',
+                    'Reflection & Growth',
+                    'Halfway Hero - Look How Far You\'ve Come!',
+                    'Building Resilience',
+                    'Social Connections',
+                    'Mind-Body Connection',
+                    'Preparing for Success',
+                    'Champion Finish!'
+                ];
+                
+                const boosters = [
+                    'Starting is the hardest part - you\'re already winning! 🎉',
+                    'You showed up again - that takes courage! 💪',
+                    'Small changes are adding up! ✨',
+                    'You\'re building lifelong habits! 🌟',
+                    'Trying new things shows bravery! 🦸',
+                    'Halfway there - look at your progress! 🏔️',
+                    'Every setback is a setup for comeback! 🚀',
+                    'You\'re stronger than you think! 💫',
+                    'Your consistency is impressive! 🌈',
+                    'You\'ve learned so much about yourself! 🎯',
+                    'Almost there - but this is just the beginning! 🏁',
+                    'You did it! You can do it again! 👑'
+                ];
+                
+                for (let week = 1; week <= 12; week++) {
+                    weeks.push({
+                        weekNumber: week,
+                        theme: themes[week - 1],
+                        booster: boosters[week - 1],
+                        sessions: [
+                            { day: 'Monday', activity: 'Session 1' },
+                            { day: 'Wednesday', activity: 'Session 2' },
+                            { day: 'Friday', activity: 'Session 3' }
+                        ]
+                    });
+                }
+                
+                return weeks;
+            };
+
+            const generateNutritionChallenges = (data) => {
+                if (!data.goals.includes('mindful-eating') && !data.goals.includes('digestive-health')) return [];
+                
+                return [
+                    { week: 1, challenge: '5 Senses Meal', description: 'Pick one meal. Notice: What do you SEE? SMELL? FEEL? TASTE? HEAR?', icon: '👁️' },
+                    { week: 2, challenge: 'Rainbow Plate', description: 'Try to eat foods of different colors each day', icon: '🌈' },
+                    { week: 3, challenge: 'Hunger Scale', description: 'Rate hunger 1-10 before and after meals. Eat at 3-4, stop at 7-8', icon: '📊' },
+                    { week: 4, challenge: 'Slow Down Challenge', description: 'Take 20 chews per bite for one meal', icon: '🐌' },
+                    { week: 5, challenge: 'New Food Explorer', description: 'Try ONE new healthy food. Rate it 1-5 stars', icon: '🔍' },
+                    { week: 6, challenge: 'Water Warrior', description: 'Drink water with every meal and snack', icon: '💧' },
+                    { week: 7, challenge: 'Breakfast Champion', description: 'Eat breakfast 5 days this week', icon: '🍳' },
+                    { week: 8, challenge: 'Mindful Snacking', description: 'Before snacking, ask: Am I hungry or bored/sad/stressed?', icon: '🤔' },
+                    { week: 9, challenge: 'Veggie Victory', description: 'Add a vegetable to 2 meals every day', icon: '🥦' },
+                    { week: 10, challenge: 'Gratitude Before Eating', description: 'Think of one thing you\'re grateful for about your food', icon: '🙏' },
+                    { week: 11, challenge: 'Portion Detective', description: 'Use your hand: protein=palm, veggies=fist, carbs=cupped hand', icon: '✋' },
+                    { week: 12, challenge: 'Create Balanced Plate', description: 'Design your ideal balanced meal', icon: '🎨' }
+                ];
+            };
+
+            const generateEmotionalActivities = (data) => {
+                if (!data.goals.includes('emotional-regulation') && 
+                    !data.goals.includes('anxiety-reduction') && 
+                    !data.goals.includes('self-confidence')) return [];
+                
+                return [
+                    { week: 1, activity: 'Feelings Journal', description: 'Draw or write about your feelings today', icon: '📔' },
+                    { week: 2, activity: '5-4-3-2-1 Grounding', description: 'Name: 5 things you SEE, 4 TOUCH, 3 HEAR, 2 SMELL, 1 TASTE', icon: '🌟' },
+                    { week: 3, activity: 'Belly Breathing', description: 'Breathe in for 4, hold 4, out 4. Feel belly rise and fall', icon: '🎈' },
+                    { week: 4, activity: 'Strength Statements', description: 'Write 5 things you\'re good at. Read daily!', icon: '💪' },
+                    { week: 5, activity: 'Worry Time', description: 'Set aside 10 min to write worries. Then do something fun!', icon: '⏰' },
+                    { week: 6, activity: 'Compliment Challenge', description: 'Give yourself one genuine compliment every day', icon: '💝' },
+                    { week: 7, activity: 'Mood Tracker', description: 'Color how you feel each day. Notice patterns', icon: '🎨' },
+                    { week: 8, activity: 'Progressive Muscle Relaxation', description: 'Tense and release each muscle group - toes to head', icon: '🧘' },
+                    { week: 9, activity: 'Gratitude Tree', description: 'Draw a tree, add a "leaf" each day with something you\'re grateful for', icon: '🌳' },
+                    { week: 10, activity: 'Letter to Future You', description: 'Write to yourself 1 year from now', icon: '✉️' },
+                    { week: 11, activity: 'Calm Down Kit', description: 'Gather items that help you feel calm', icon: '🧰' },
+                    { week: 12, activity: 'Celebration Ceremony', description: 'Create special way to celebrate completing this journey!', icon: '🎉' }
+                ];
+            };
+
+            const generateMountainTracker = (data) => {
+                return {
+                    summit: 'Wellness Champion - Confident, Strong & Proud! 🏆',
+                    base: 'Starting Your Journey - First Step is Bravest! 🎯'
+                };
+            };
+
+            const exportResearchData = () => {
+                // Helper function to get age range
+                const getAgeRange = (age) => {
+                    const ageNum = parseInt(age);
+                    if (ageNum <= 8) return '5-8';
+                    if (ageNum <= 12) return '9-12';
+                    return '13-18';
+                };
+
+                // Helper function to calculate barrier averages
+                const calculateBarrierAverage = (scores) => {
+                    const sum = scores.reduce((a, b) => a + b, 0);
+                    return parseFloat((sum / scores.length).toFixed(2));
+                };
+
+                // Determine alignment type
+                const determineAlignmentType = () => {
+                    const dataBarrier = barrierResults.topBarrier.name.toLowerCase();
+                    const clientBarrier = getBarrierLabel(barrierResults.clientPerception).toLowerCase();
+                    const providerBarrier = getProviderBarrierLabel(clientData.providerBarrier).toLowerCase();
+                    
+                    // Check if all three align
+                    const dataClientMatch = dataBarrier.includes(clientBarrier.split(' ')[0]);
+                    const dataProviderMatch = dataBarrier.includes(providerBarrier.split(' ')[0]);
+                    const clientProviderMatch = clientBarrier.includes(providerBarrier.split(' ')[0]);
+                    
+                    if (dataClientMatch && dataProviderMatch) {
+                        return 'strong-alignment';
+                    } else if (dataClientMatch || dataProviderMatch || clientProviderMatch) {
+                        return 'moderate-alignment';
+                    } else {
+                        return 'significant-discrepancy';
+                    }
+                };
+
+                // Create de-identified research record
+                const researchData = {
+                    id: `HQ-${new Date().getFullYear()}-${String(Date.now()).slice(-4)}`,
+                    timestamp: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`,
+                    ageRange: getAgeRange(clientData.age),
+                    barriers: {
+                        mentalHealth: calculateBarrierAverage([assessmentData.q1, assessmentData.q5, assessmentData.q9]),
+                        psychologicalWeight: calculateBarrierAverage([assessmentData.q2, assessmentData.q12]),
+                        nutrition: calculateBarrierAverage([assessmentData.q3, assessmentData.q4]),
+                        physicalActivity: assessmentData.q4,
+                        hopeResilience: calculateBarrierAverage([assessmentData.q9, assessmentData.q12]),
+                        mindfulness: calculateBarrierAverage([assessmentData.q1, assessmentData.q5]),
+                        intuitiveEating: calculateBarrierAverage([assessmentData.q6, assessmentData.q8, assessmentData.q11]),
+                        antiBullying: calculateBarrierAverage([assessmentData.q7, assessmentData.q10])
+                    },
+                    topBarrier: barrierResults.topBarrier.name,
+                    clientPerceived: barrierResults.clientPerception,
+                    providerAssessed: clientData.providerBarrier,
+                    alignmentType: determineAlignmentType(),
+                    goalsSelected: clientData.goals
+                };
+
+                // Convert to JSON string
+                const dataStr = JSON.stringify(researchData, null, 2);
+                
+                // Create download
+                const dataBlob = new Blob([dataStr], {type: 'application/json'});
+                const url = URL.createObjectURL(dataBlob);
+                const link = document.createElement('a');
+                link.href = url;
+                link.download = `healthquest-research-${researchData.id}.json`;
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+                
+                // Show success message
+                alert('✅ Research data exported!\n\nSave this file to your research-data folder for analysis.\n\nFile: ' + link.download);
+            };
+
+            const clearAndStartNew = () => {
+                if (confirm('Start a new client plan? Current plan will be cleared.')) {
+                    setClientData({
+                        age: '',
+                        goals: [],
+                        interests: [],
+                        timeAvailability: '',
+                        activityStyles: [],
+                        limitations: [],
+                        barriers: [],
+                        notes: '',
+                        providerBarrier: ''
+                    });
+                    setAssessmentData({
+                        q1: 0, q2: 0, q3: 0, q4: 0, q5: 0, q6: 0,
+                        q7: 0, q8: 0, q9: 0, q10: 0, q11: 0, q12: 0,
+                        clientBarrier: ''
+                    });
+                    setBarrierResults(null);
+                    setGeneratedPlan(null);
+                    setView('home');
+                }
+            };
+
+            const getBarrierLabel = (id) => {
+                const labels = {
+                    'mental-health': 'Feeling sad, stressed, or worried',
+                    'physical-activity': 'Being active and exercising',
+                    'nutrition': 'Eating healthy foods',
+                    'resilience': 'Not giving up when things are hard',
+                    'mindfulness': 'Calming down when upset',
+                    'body-awareness': 'Knowing when I\'m full',
+                    'bullying': 'People being mean to me',
+                    'body-image': 'How my body looks',
+                    'motivation': 'Keeping going with my goals',
+                    'social': 'Feeling left out or alone',
+                    'mindful-eating': 'Paying attention to my food',
+                    'hope': 'Feeling hopeful about the future'
+                };
+                return labels[id] || id;
+            };
+
+            const getProviderBarrierLabel = (id) => {
+                const labels = {
+                    'mental-health': 'Mental Health Barriers',
+                    'psychological-weight': 'Psychological Factors & Weight Management',
+                    'nutrition': 'Nutrition & Mindful Eating',
+                    'physical-activity': 'Physical Activity',
+                    'hope-resilience': 'Hope & Resilience',
+                    'mindfulness': 'Mindfulness & Psychological Factors',
+                    'intuitive-eating': 'Intuitive Eating & Body Awareness',
+                    'anti-bullying': 'Anti-Bullying'
+                };
+                return labels[id] || id;
+            };
+
+            // ========================================
+            // VIEWS
+            // ========================================
+
+            const HomeView = () => (
+                <div className="min-h-screen flex items-center justify-center p-4">
+                    <div className="max-w-xl w-full bg-white rounded-3xl shadow-2xl p-8">
+                        <div className="text-center mb-8">
+                            <div className="mb-4 flex justify-center">
+                                <div className="text-6xl">🏔️</div>
+                            </div>
+                            <h1 className="text-3xl font-bold mb-2" style={{color: '#00A3E0'}}>
+                                HealthQuest Wellness Coach
+                            </h1>
+                            <p className="text-lg mb-1" style={{color: '#7AC943'}}>
+                                Provider Planning Tool
+                            </p>
+                            <p className="text-sm text-gray-500 mb-6">
+                                ABCD & Metabolic Health Clinic
+                            </p>
+                            
+                            <div className="bg-blue-50 border-2 border-blue-200 rounded-xl p-4 mb-6">
+                                <p className="text-sm text-gray-700">
+                                    <strong className="text-blue-900">HIPAA-Compliant Tool</strong><br/>
+                                    No client data is stored. Create plan → Print → Clear.
+                                </p>
+                            </div>
+                        </div>
+                        
+                        <div className="space-y-4">
+                            <button 
+                                onClick={() => setView('assessment')}
+                                className="w-full text-white font-bold py-4 px-8 rounded-2xl text-xl hover:shadow-2xl transform hover:scale-105 transition-all hq-primary-btn"
+                            >
+                                🎯 Start with Barrier Assessment
+                            </button>
+                            
+                            <button 
+                                onClick={() => setView('intake')}
+                                className="w-full text-white font-bold py-4 px-8 rounded-2xl text-xl hover:shadow-2xl transform hover:scale-105 transition-all hq-secondary-btn"
+                            >
+                                📋 Skip to Intake Form
+                            </button>
+                        </div>
+                        
+                        <div className="mt-8 text-center text-xs text-gray-500">
+                            <p className="mb-2 font-semibold" style={{color: '#00A3E0'}}>Recommended: Start with Barrier Assessment</p>
+                            <p className="mb-3 text-gray-600">Identifies primary wellness challenges to guide goal selection</p>
+                            <p>Evidence-based guidelines from:</p>
+                            <p>CDC • AAP • NAMI • NEDA • MyPlate.gov • NASPGHAN</p>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const AssessmentView = () => {
+                const questions = [
+                    {
+                        id: 1,
+                        category: 'Mental Health & Emotional Well-being',
+                        question: 'How often do you feel sad, stressed, or worried — even if you\'re not sure why?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 2,
+                        category: 'Physical Activity & Motivation',
+                        question: 'How often do you enjoy playing outside or doing activities like sports, dancing, or running around?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    },
+                    {
+                        id: 3,
+                        category: 'Nutrition & Healthy Eating Habits',
+                        question: 'How often do you include fruits or vegetables in your snacks or meals?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    },
+                    {
+                        id: 4,
+                        category: 'Resilience & Confidence',
+                        question: 'When things get hard, how often do you feel like giving up?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 5,
+                        category: 'Mindfulness & Coping Strategies',
+                        question: 'How often do you take a few deep breaths or try to calm yourself down when you\'re upset?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    },
+                    {
+                        id: 6,
+                        category: 'Intuitive Eating & Body Awareness',
+                        question: 'How often do you notice when your body feels full and stop eating?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    },
+                    {
+                        id: 7,
+                        category: 'Bullying & Social Confidence',
+                        question: 'How often do you feel like someone is mean to you or hurts your feelings?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 8,
+                        category: 'Psychological Factors & Weight Management',
+                        question: 'How often do you feel unhappy with your body or how it looks?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 9,
+                        category: 'Motivation & Setting Goals',
+                        question: 'How often do you find it hard to keep going when you set a goal for yourself?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 10,
+                        category: 'Social Relationships & Self-Worth',
+                        question: 'How often do you feel left out or like it\'s hard to find someone to talk to?',
+                        answers: ['Never', 'Rarely', 'Sometimes', 'Always']
+                    },
+                    {
+                        id: 11,
+                        category: 'Mindful Eating & Enjoying Food',
+                        question: 'How often do you enjoy the taste of your food and pay attention to it while eating?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    },
+                    {
+                        id: 12,
+                        category: 'Hope & Future Optimism',
+                        question: 'How often do you feel hopeful about what you can do in the future?',
+                        answers: ['Always', 'Sometimes', 'Rarely', 'Never']
+                    }
+                ];
+
+                const allQuestionsAnswered = [1,2,3,4,5,6,7,8,9,10,11,12].every(num => assessmentData[`q${num}`] > 0);
+                const isComplete = allQuestionsAnswered && assessmentData.clientBarrier;
+
+                return (
+                    <div className="min-h-screen py-8 px-4">
+                        <div className="max-w-4xl mx-auto">
+                            <div className="bg-white rounded-3xl shadow-2xl p-8">
+                                <div className="flex items-center justify-between mb-6">
+                                    <div>
+                                        <h2 className="text-3xl font-bold" style={{color: '#00A3E0'}}>
+                                            Wellness Barrier Assessment
+                                        </h2>
+                                        <p className="text-gray-600 mt-2">
+                                            Identifies challenges to prioritize wellness goals
+                                        </p>
+                                    </div>
+                                    <button 
+                                        onClick={() => setView('home')}
+                                        className="text-gray-500 hover:text-gray-700"
+                                    >
+                                        ✕ Cancel
+                                    </button>
+                                </div>
+
+                                <div className="space-y-6">
+                                    {questions.map((q) => (
+                                        <div key={q.id} className="border-2 border-gray-200 rounded-xl p-6">
+                                            <p className="text-sm font-semibold mb-1" style={{color: '#7AC943'}}>
+                                                {q.category}
+                                            </p>
+                                            <p className="font-bold text-gray-800 mb-4">
+                                                {q.id}. {q.question}
+                                            </p>
+                                            
+                                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                                {q.answers.map((answer, idx) => (
+                                                    <label 
+                                                        key={idx}
+                                                        className={`p-4 border-2 rounded-xl cursor-pointer text-center transition-all ${
+                                                            assessmentData[`q${q.id}`] === idx + 1 
+                                                                ? 'bg-blue-50' 
+                                                                : 'border-gray-300 hover:border-blue-400'
+                                                        }`}
+                                                        style={assessmentData[`q${q.id}`] === idx + 1 ? {borderColor: '#00A3E0'} : {}}
+                                                    >
+                                                        <input 
+                                                            type="radio"
+                                                            name={`q${q.id}`}
+                                                            checked={assessmentData[`q${q.id}`] === idx + 1}
+                                                            onChange={() => setAssessmentData({
+                                                                ...assessmentData,
+                                                                [`q${q.id}`]: idx + 1
+                                                            })}
+                                                            className="hidden"
+                                                        />
+                                                        <div className="font-semibold text-sm">{answer}</div>
+                                                        <div className="text-xs text-gray-500 mt-1">{idx + 1} pt</div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {/* Client Self-Identified Barrier */}
+                                <div className="mt-8 border-4 rounded-2xl p-6" style={{borderColor: '#00A3E0', background: 'linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%)'}}>
+                                    <div className="bg-white rounded-xl p-6">
+                                        <p className="font-bold text-xl mb-2" style={{color: '#00A3E0'}}>
+                                            💭 One More Question...
+                                        </p>
+                                        <p className="font-bold text-gray-800 mb-4">
+                                            What do YOU think is your biggest challenge right now?
+                                        </p>
+                                        <p className="text-sm text-gray-600 mb-4">
+                                            Pick the area where you feel you struggle the most:
+                                        </p>
+                                        
+                                        <div className="space-y-3">
+                                            {[
+                                                {id: 'mental-health', label: '😔 Feeling sad, stressed, or worried', icon: '🧠'},
+                                                {id: 'physical-activity', label: '💪 Being active and exercising', icon: '🏃'},
+                                                {id: 'nutrition', label: '🥗 Eating healthy foods', icon: '🍎'},
+                                                {id: 'resilience', label: '😞 Not giving up when things are hard', icon: '💪'},
+                                                {id: 'mindfulness', label: '😰 Calming down when upset', icon: '🧘'},
+                                                {id: 'body-awareness', label: '🍽️ Knowing when I\'m full', icon: '🫧'},
+                                                {id: 'bullying', label: '😢 People being mean to me', icon: '🤝'},
+                                                {id: 'body-image', label: '😟 How my body looks', icon: '💭'},
+                                                {id: 'motivation', label: '😓 Keeping going with my goals', icon: '🎯'},
+                                                {id: 'social', label: '😔 Feeling left out or alone', icon: '👥'},
+                                                {id: 'mindful-eating', label: '🍕 Paying attention to my food', icon: '🍽️'},
+                                                {id: 'hope', label: '😐 Feeling hopeful about the future', icon: '🌟'}
+                                            ].map(option => (
+                                                <label 
+                                                    key={option.id}
+                                                    className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${
+                                                        assessmentData.clientBarrier === option.id 
+                                                            ? 'bg-blue-50' 
+                                                            : 'border-gray-300 hover:border-blue-400'
+                                                    }`}
+                                                    style={assessmentData.clientBarrier === option.id ? {borderColor: '#00A3E0'} : {}}
+                                                >
+                                                    <input 
+                                                        type="radio"
+                                                        name="clientBarrier"
+                                                        checked={assessmentData.clientBarrier === option.id}
+                                                        onChange={() => setAssessmentData({
+                                                            ...assessmentData,
+                                                            clientBarrier: option.id
+                                                        })}
+                                                        className="mr-3"
+                                                    />
+                                                    <span className="text-2xl mr-3">{option.icon}</span>
+                                                    <span className="font-semibold">{option.label}</span>
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex gap-4 mt-8">
+                                    <button 
+                                        onClick={() => setView('home')}
+                                        className="flex-1 bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-400 transition-all"
+                                    >
+                                        Cancel
+                                    </button>
+                                    <button 
+                                        onClick={calculateBarriers}
+                                        disabled={!isComplete}
+                                        className="flex-2 text-white font-bold py-3 px-8 rounded-xl hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all hq-primary-btn"
+                                    >
+                                        Calculate Barriers & Continue
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            const IntakeView = () => (
+                <div className="min-h-screen py-8 px-4">
+                    <div className="max-w-4xl mx-auto">
+                        <div className="bg-white rounded-3xl shadow-2xl p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <h2 className="text-3xl font-bold" style={{color: '#00A3E0'}}>
+                                    Client Intake Form
+                                </h2>
+                                <button 
+                                    onClick={() => setView('home')}
+                                    className="text-gray-500 hover:text-gray-700"
+                                >
+                                    ✕ Cancel
+                                </button>
+                            </div>
+                            
+                            {/* Barrier Results Display */}
+                            {barrierResults && (
+                                <div className="mb-8 p-6 rounded-2xl" style={{background: 'linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%)'}}>
+                                    <h3 className="text-xl font-bold mb-4" style={{color: '#00A3E0'}}>
+                                        📊 Barrier Assessment Results
+                                    </h3>
+                                    
+                                    <div className="bg-white rounded-xl p-4 mb-4">
+                                        <p className="font-bold text-gray-800 mb-2">
+                                            Top Barrier (Data-Driven): {barrierResults.topBarrier.name}
+                                        </p>
+                                        <p className="text-sm text-gray-600">
+                                            Average Score: {barrierResults.topBarrier.average.toFixed(2)} / 4.0
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-xl p-4 mb-4">
+                                        <p className="font-bold text-gray-800 mb-3">All Barriers (Ranked):</p>
+                                        <div className="space-y-2">
+                                            {barrierResults.barriers.map((barrier, idx) => (
+                                                <div key={idx} className="flex items-center justify-between">
+                                                    <span className="text-sm font-semibold text-gray-700">
+                                                        {idx + 1}. {barrier.name}
+                                                    </span>
+                                                    <div className="flex items-center space-x-2">
+                                                        <div className="w-32 h-4 bg-gray-200 rounded-full overflow-hidden">
+                                                            <div 
+                                                                className="h-full rounded-full" 
+                                                                style={{
+                                                                    width: `${(barrier.average / 4) * 100}%`,
+                                                                    background: idx === 0 ? '#FF6B6B' : idx < 3 ? '#F39C12' : '#7AC943'
+                                                                }}
+                                                            />
+                                                        </div>
+                                                        <span className="text-sm font-bold text-gray-700 w-12 text-right">
+                                                            {barrier.average.toFixed(2)}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                    
+                                    {/* Provider Assessment Section */}
+                                    <div className="bg-purple-50 border-2 border-purple-300 rounded-xl p-4 mb-4">
+                                        <p className="font-bold text-gray-800 mb-3">👨‍⚕️ Your Clinical Assessment (Provider Only):</p>
+                                        <p className="text-sm text-gray-700 mb-3">
+                                            Based on your clinical judgment, what do you believe is this client's primary barrier?
+                                        </p>
+                                        <select 
+                                            value={clientData.providerBarrier}
+                                            onChange={(e) => setClientData({...clientData, providerBarrier: e.target.value})}
+                                            className="w-full p-3 border-2 rounded-xl focus:outline-none"
+                                            style={{borderColor: '#9B59B6'}}
+                                        >
+                                            <option value="">-- Select Primary Barrier --</option>
+                                            <option value="mental-health">Mental Health Barriers</option>
+                                            <option value="psychological-weight">Psychological Factors & Weight Management</option>
+                                            <option value="nutrition">Nutrition & Mindful Eating</option>
+                                            <option value="physical-activity">Physical Activity</option>
+                                            <option value="hope-resilience">Hope & Resilience</option>
+                                            <option value="mindfulness">Mindfulness & Psychological Factors</option>
+                                            <option value="intuitive-eating">Intuitive Eating & Body Awareness</option>
+                                            <option value="anti-bullying">Anti-Bullying</option>
+                                        </select>
+                                    </div>
+                                    
+                                    {/* Three-Way Comparison */}
+                                    {clientData.providerBarrier && (
+                                        <div className="bg-yellow-50 border-2 border-yellow-400 rounded-xl p-4">
+                                            <p className="font-bold text-gray-800 mb-3">🔍 Three-Way Barrier Comparison:</p>
+                                            <div className="space-y-3">
+                                                <div className="flex items-start space-x-3">
+                                                    <span className="text-2xl">📊</span>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-800">Data-Driven Assessment:</p>
+                                                        <p className="text-sm text-gray-700">{barrierResults.topBarrier.name}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start space-x-3">
+                                                    <span className="text-2xl">💭</span>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-800">Client's Self-Perception:</p>
+                                                        <p className="text-sm text-gray-700">{getBarrierLabel(barrierResults.clientPerception)}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="flex items-start space-x-3">
+                                                    <span className="text-2xl">👨‍⚕️</span>
+                                                    <div>
+                                                        <p className="font-semibold text-gray-800">Provider's Clinical Assessment:</p>
+                                                        <p className="text-sm text-gray-700">{getProviderBarrierLabel(clientData.providerBarrier)}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div className="mt-4 pt-4 border-t-2 border-yellow-500">
+                                                <p className="text-xs text-gray-600">
+                                                    <strong>Clinical Note:</strong> Discrepancies between these three perspectives can reveal valuable insights about client self-awareness, readiness for change, and potential areas for therapeutic discussion.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    )}
+                                    
+                                    <div className="bg-green-50 border-2 border-green-300 rounded-xl p-4 mt-4">
+                                        <p className="font-bold text-gray-800 mb-2">✅ Recommended Goals (Pre-selected):</p>
+                                        <p className="text-sm text-gray-700">
+                                            Based on assessment, the following goals have been automatically selected. You can modify them below.
+                                        </p>
+                                    </div>
+                                </div>
+                            )}
+                            
+                            <div className="space-y-6">
+                                {/* Age */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-2">
+                                        Client Age
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        min="5" 
+                                        max="18"
+                                        value={clientData.age}
+                                        onChange={(e) => setClientData({...clientData, age: e.target.value})}
+                                        className="w-full p-3 border-2 rounded-xl focus:outline-none"
+                                        style={{borderColor: '#00A3E0'}}
+                                        placeholder="Enter age (5-18)"
+                                    />
+                                </div>
+
+                                {/* Goals */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Primary Wellness Goals (Select 1-3)
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {[
+                                            {id: 'self-confidence', label: '⭐ Self-Confidence', desc: 'Build belief in abilities'},
+                                            {id: 'physical-fitness', label: '💪 Physical Fitness', desc: 'Get stronger, more active'},
+                                            {id: 'mindful-eating', label: '🥗 Mindful Eating', desc: 'Healthy food choices'},
+                                            {id: 'emotional-regulation', label: '😌 Emotional Regulation', desc: 'Manage big feelings'},
+                                            {id: 'anxiety-reduction', label: '🧘 Anxiety Reduction', desc: 'Feel calmer'},
+                                            {id: 'sleep-hygiene', label: '😴 Sleep Hygiene', desc: 'Better sleep'},
+                                            {id: 'digestive-health', label: '🫧 Digestive Health', desc: 'Tummy comfort'},
+                                            {id: 'social-connection', label: '🤝 Social Connection', desc: 'Build relationships'}
+                                        ].map(goal => (
+                                            <label 
+                                                key={goal.id} 
+                                                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${clientData.goals?.includes(goal.id) ? 'bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                                                style={clientData.goals?.includes(goal.id) ? {borderColor: '#00A3E0'} : {}}
+                                            >
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={clientData.goals?.includes(goal.id)}
+                                                    onChange={() => handleCheckbox('goals', goal.id)}
+                                                    className="mr-3"
+                                                />
+                                                <span className="font-semibold">{goal.label}</span>
+                                                <p className="text-sm text-gray-600 ml-6">{goal.desc}</p>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Interests */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Interests & Themes
+                                    </label>
+                                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                        {[
+                                            {id: 'animals', emoji: '🐾', label: 'Animals'},
+                                            {id: 'superheroes', emoji: '🦸', label: 'Superheroes'},
+                                            {id: 'sports', emoji: '⚽', label: 'Sports'},
+                                            {id: 'dance', emoji: '💃', label: 'Dance'},
+                                            {id: 'nature', emoji: '🌳', label: 'Nature'},
+                                            {id: 'music', emoji: '🎵', label: 'Music'},
+                                            {id: 'art', emoji: '🎨', label: 'Art'},
+                                            {id: 'gaming', emoji: '🎮', label: 'Gaming'}
+                                        ].map(interest => (
+                                            <label 
+                                                key={interest.id} 
+                                                className={`p-4 border-2 rounded-xl cursor-pointer text-center transition-all ${clientData.interests?.includes(interest.id) ? 'bg-green-50' : 'border-gray-300 hover:border-green-400'}`}
+                                                style={clientData.interests?.includes(interest.id) ? {borderColor: '#7AC943'} : {}}
+                                            >
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={clientData.interests?.includes(interest.id)}
+                                                    onChange={() => handleCheckbox('interests', interest.id)}
+                                                    className="hidden"
+                                                />
+                                                <div className="text-3xl mb-2">{interest.emoji}</div>
+                                                <div className="text-sm font-semibold">{interest.label}</div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Time Availability */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Time Availability
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            {id: '15-daily', label: '15 minutes daily'},
+                                            {id: '3-weekly-30', label: '3 times per week (30 min each)'},
+                                            {id: 'flexible', label: 'Flexible schedule'}
+                                        ].map(option => (
+                                            <label 
+                                                key={option.id} 
+                                                className={`block p-4 border-2 rounded-xl cursor-pointer transition-all ${clientData.timeAvailability === option.id ? 'bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                                                style={clientData.timeAvailability === option.id ? {borderColor: '#00A3E0'} : {}}
+                                            >
+                                                <input 
+                                                    type="radio"
+                                                    name="timeAvailability"
+                                                    checked={clientData.timeAvailability === option.id}
+                                                    onChange={() => setClientData({...clientData, timeAvailability: option.id})}
+                                                    className="mr-3"
+                                                />
+                                                {option.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Activity Styles */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Preferred Activity Styles
+                                    </label>
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                        {[
+                                            {id: 'hiit', label: '🔥 High-Energy Workouts'},
+                                            {id: 'play-based', label: '🎮 Play-Based Movement'},
+                                            {id: 'dance', label: '💃 Dance'},
+                                            {id: 'breathing', label: '🧘 Breathing Exercises'},
+                                            {id: 'journaling', label: '📔 Journaling'},
+                                            {id: 'creative', label: '🎨 Creative Expression'}
+                                        ].map(style => (
+                                            <label 
+                                                key={style.id} 
+                                                className={`p-4 border-2 rounded-xl cursor-pointer transition-all ${clientData.activityStyles?.includes(style.id) ? 'bg-green-50' : 'border-gray-300 hover:border-green-400'}`}
+                                                style={clientData.activityStyles?.includes(style.id) ? {borderColor: '#7AC943'} : {}}
+                                            >
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={clientData.activityStyles?.includes(style.id)}
+                                                    onChange={() => handleCheckbox('activityStyles', style.id)}
+                                                    className="mr-3"
+                                                />
+                                                {style.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Limitations */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Physical/Sensory Limitations (Optional)
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            {id: 'joint-pain', label: 'Joint pain or physical discomfort'},
+                                            {id: 'low-energy', label: 'Low energy or fatigues easily'},
+                                            {id: 'sensory', label: 'Sensory sensitivities'},
+                                            {id: 'dietary', label: 'Food allergies or restrictions'}
+                                        ].map(limitation => (
+                                            <label 
+                                                key={limitation.id} 
+                                                className={`block p-3 border-2 rounded-xl cursor-pointer transition-all ${clientData.limitations?.includes(limitation.id) ? 'bg-blue-50' : 'border-gray-300 hover:border-blue-400'}`}
+                                                style={clientData.limitations?.includes(limitation.id) ? {borderColor: '#00A3E0'} : {}}
+                                            >
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={clientData.limitations?.includes(limitation.id)}
+                                                    onChange={() => handleCheckbox('limitations', limitation.id)}
+                                                    className="mr-3"
+                                                />
+                                                {limitation.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Barriers */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-3">
+                                        Barriers to Wellness (Optional)
+                                    </label>
+                                    <div className="space-y-2">
+                                        {[
+                                            {id: 'financial', label: 'Financial constraints'},
+                                            {id: 'stress', label: 'High stress or anxiety'},
+                                            {id: 'food-access', label: 'Limited access to healthy food'},
+                                            {id: 'safe-space', label: 'No safe place for physical activity'},
+                                            {id: 'motivation', label: 'Difficulty staying motivated'}
+                                        ].map(barrier => (
+                                            <label 
+                                                key={barrier.id} 
+                                                className={`block p-3 border-2 rounded-xl cursor-pointer transition-all ${clientData.barriers?.includes(barrier.id) ? 'bg-green-50' : 'border-gray-300 hover:border-green-400'}`}
+                                                style={clientData.barriers?.includes(barrier.id) ? {borderColor: '#7AC943'} : {}}
+                                            >
+                                                <input 
+                                                    type="checkbox"
+                                                    checked={clientData.barriers?.includes(barrier.id)}
+                                                    onChange={() => handleCheckbox('barriers', barrier.id)}
+                                                    className="mr-3"
+                                                />
+                                                {barrier.label}
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+
+                                {/* Clinical Notes */}
+                                <div>
+                                    <label className="block text-lg font-semibold text-gray-800 mb-2">
+                                        Clinical Notes (Optional - Will NOT print)
+                                    </label>
+                                    <textarea 
+                                        value={clientData.notes}
+                                        onChange={(e) => setClientData({...clientData, notes: e.target.value})}
+                                        className="w-full p-3 border-2 rounded-xl focus:outline-none"
+                                        style={{borderColor: '#00A3E0'}}
+                                        rows="4"
+                                        placeholder="Private notes for your reference (not included in printouts)"
+                                    />
+                                </div>
+                            </div>
+
+                            <div className="flex gap-4 mt-8">
+                                <button 
+                                    onClick={() => setView('home')}
+                                    className="flex-1 bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-400 transition-all"
+                                >
+                                    Cancel
+                                </button>
+                                <button 
+                                    onClick={generatePlan}
+                                    disabled={!clientData.age || clientData.goals?.length === 0}
+                                    className="flex-2 text-white font-bold py-3 px-8 rounded-xl hover:shadow-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all hq-primary-btn"
+                                >
+                                    Generate Wellness Plan ✨
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            );
+
+            const PlanView = () => {
+                if (!generatedPlan) return null;
+
+                const printGoals = () => window.print();
+                const printCalendar = () => window.print();
+                const printAll = () => window.print();
+
+                return (
+                    <div className="min-h-screen py-8 px-4">
+                        {/* Print Header */}
+                        <div className="print-header text-center mb-6">
+                            <h1 className="text-2xl font-bold" style={{color: '#00A3E0'}}>HealthQuest Wellness Coach</h1>
+                            <p className="text-sm text-gray-600">12-Week Personalized Wellness Plan</p>
+                            <p className="text-sm text-gray-600">ABCD & Metabolic Health Clinic</p>
+                            <p className="text-xs text-gray-500">Generated: {generatedPlan.createdDate}</p>
+                        </div>
+
+                        <div className="max-w-6xl mx-auto">
+                            {/* EXPORT RESEARCH DATA PROMPT */}
+                            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-6 mb-8 no-print">
+                                <h3 className="text-xl font-bold mb-3" style={{color: '#00A3E0'}}>
+                                    📊 Contribute to Research Database?
+                                </h3>
+                                <p className="text-sm text-gray-700 mb-4">
+                                    Help improve care by sharing de-identified assessment data. No client names or personal information will be included.
+                                </p>
+                                <div className="bg-white rounded-xl p-4 mb-4">
+                                    <p className="text-xs text-gray-600 mb-2">
+                                        <strong>What will be exported:</strong>
+                                    </p>
+                                    <ul className="text-xs text-gray-600 space-y-1 ml-4">
+                                        <li>• Age range (not exact age)</li>
+                                        <li>• Barrier scores (numbers only)</li>
+                                        <li>• Perceived barriers (categories)</li>
+                                        <li>• Month/year timestamp (not exact date)</li>
+                                        <li>• Goals selected</li>
+                                    </ul>
+                                    <p className="text-xs font-bold text-green-700 mt-3">
+                                        ✅ 100% HIPAA Compliant - No PHI Included
+                                    </p>
+                                </div>
+                                <div className="flex gap-4">
+                                    <button 
+                                        onClick={exportResearchData}
+                                        className="px-6 py-3 rounded-xl font-bold text-white hover:opacity-90 transition"
+                                        style={{background: 'linear-gradient(135deg, #00A3E0 0%, #0077B3 100%)'}}
+                                    >
+                                        📥 Export Research Data
+                                    </button>
+                                    <button 
+                                        onClick={() => document.querySelector('.bg-blue-50').style.display = 'none'}
+                                        className="px-6 py-3 rounded-xl font-bold text-gray-600 bg-gray-200 hover:bg-gray-300 transition"
+                                    >
+                                        Skip
+                                    </button>
+                                </div>
+                            </div>
+
+                            {/* PROVIDER-ONLY: Barrier Comparison Analysis (NO PRINT) */}
+                            {barrierResults && clientData.providerBarrier && (
+                                <div className="bg-gradient-to-r from-purple-100 to-pink-100 rounded-3xl shadow-xl p-8 mb-8 no-print">
+                                    <div className="flex items-center justify-between mb-6">
+                                        <h2 className="text-2xl font-bold" style={{color: '#9B59B6'}}>
+                                            🔬 Clinical Insight: Barrier Comparison Analysis
+                                        </h2>
+                                        <span className="bg-purple-600 text-white text-xs font-bold px-3 py-1 rounded-full">
+                                            PROVIDER ONLY
+                                        </span>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-2xl p-6 mb-4">
+                                        <h3 className="text-lg font-bold mb-4" style={{color: '#9B59B6'}}>Three Perspectives:</h3>
+                                        
+                                        <div className="grid md:grid-cols-3 gap-4">
+                                            <div className="border-2 rounded-xl p-4" style={{borderColor: '#00A3E0'}}>
+                                                <div className="text-center mb-3">
+                                                    <span className="text-4xl">📊</span>
+                                                    <p className="font-bold text-sm mt-2" style={{color: '#00A3E0'}}>Data-Driven</p>
+                                                </div>
+                                                <p className="text-center font-semibold text-gray-800">{barrierResults.topBarrier.name}</p>
+                                                <p className="text-center text-sm text-gray-600 mt-2">Score: {barrierResults.topBarrier.average.toFixed(2)}/4.0</p>
+                                            </div>
+                                            
+                                            <div className="border-2 rounded-xl p-4" style={{borderColor: '#F39C12'}}>
+                                                <div className="text-center mb-3">
+                                                    <span className="text-4xl">💭</span>
+                                                    <p className="font-bold text-sm mt-2" style={{color: '#F39C12'}}>Client Self-Perception</p>
+                                                </div>
+                                                <p className="text-center font-semibold text-gray-800">{getBarrierLabel(barrierResults.clientPerception)}</p>
+                                            </div>
+                                            
+                                            <div className="border-2 rounded-xl p-4" style={{borderColor: '#9B59B6'}}>
+                                                <div className="text-center mb-3">
+                                                    <span className="text-4xl">👨‍⚕️</span>
+                                                    <p className="font-bold text-sm mt-2" style={{color: '#9B59B6'}}>Your Clinical Assessment</p>
+                                                </div>
+                                                <p className="text-center font-semibold text-gray-800">{getProviderBarrierLabel(clientData.providerBarrier)}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-2xl p-6">
+                                        <h3 className="text-lg font-bold mb-3" style={{color: '#9B59B6'}}>Clinical Implications:</h3>
+                                        
+                                        <div className="space-y-4">
+                                            {/* Alignment Check */}
+                                            {(() => {
+                                                const dataBarrier = barrierResults.topBarrier.name.toLowerCase();
+                                                const clientBarrier = getBarrierLabel(barrierResults.clientPerception).toLowerCase();
+                                                const providerBarrier = getProviderBarrierLabel(clientData.providerBarrier).toLowerCase();
+                                                
+                                                const allThreeAlign = 
+                                                    dataBarrier.includes(clientBarrier.split(' ')[0]) && 
+                                                    dataBarrier === providerBarrier.toLowerCase();
+                                                
+                                                const dataClientAlign = dataBarrier.includes(clientBarrier.split(' ')[0]);
+                                                const dataProviderAlign = dataBarrier === providerBarrier.toLowerCase();
+                                                const clientProviderAlign = clientBarrier.includes(providerBarrier.split(' ')[0].toLowerCase());
+                                                
+                                                if (allThreeAlign) {
+                                                    return (
+                                                        <div className="bg-green-100 border-2 border-green-400 rounded-xl p-4">
+                                                            <p className="font-bold text-green-900 mb-2">✅ Strong Alignment (All Three Agree)</p>
+                                                            <p className="text-sm text-gray-700">
+                                                                Client self-awareness is high. They recognize their primary challenge, which aligns with objective data and your clinical assessment. This suggests:
+                                                            </p>
+                                                            <ul className="text-sm text-gray-700 mt-2 ml-4 space-y-1">
+                                                                <li>• High readiness for change</li>
+                                                                <li>• Good insight into personal challenges</li>
+                                                                <li>• Strong foundation for goal-setting</li>
+                                                                <li>• Likely higher treatment adherence</li>
+                                                            </ul>
+                                                        </div>
+                                                    );
+                                                } else if (dataClientAlign && dataProviderAlign) {
+                                                    return (
+                                                        <div className="bg-green-100 border-2 border-green-400 rounded-xl p-4">
+                                                            <p className="font-bold text-green-900 mb-2">✅ Good Alignment (Data + Provider, Client Similar)</p>
+                                                            <p className="text-sm text-gray-700">
+                                                                Your clinical judgment aligns with objective data, and client shows reasonable self-awareness. Minor discrepancy in client perception may reflect:
+                                                            </p>
+                                                            <ul className="text-sm text-gray-700 mt-2 ml-4 space-y-1">
+                                                                <li>• Different terminology/understanding</li>
+                                                                <li>• Secondary vs. primary barrier confusion</li>
+                                                                <li>• Opportunity for psychoeducation</li>
+                                                            </ul>
+                                                        </div>
+                                                    );
+                                                } else if (!dataClientAlign && dataProviderAlign) {
+                                                    return (
+                                                        <div className="bg-yellow-100 border-2 border-yellow-400 rounded-xl p-4">
+                                                            <p className="font-bold text-yellow-900 mb-2">⚠️ Client Discrepancy (Data + Provider Align, Client Different)</p>
+                                                            <p className="text-sm text-gray-700">
+                                                                Client's self-perception differs from objective data and your assessment. This may indicate:
+                                                            </p>
+                                                            <ul className="text-sm text-gray-700 mt-2 ml-4 space-y-1">
+                                                                <li>• Limited self-awareness or insight</li>
+                                                                <li>• Denial or minimization of certain challenges</li>
+                                                                <li>• Focus on symptoms rather than root causes</li>
+                                                                <li>• Opportunity for motivational interviewing</li>
+                                                                <li>• May need more education about barriers</li>
+                                                            </ul>
+                                                            <p className="text-sm font-semibold text-yellow-900 mt-3">
+                                                                💡 Consider: Explore client's perception in session. What makes them feel this is their biggest challenge? This conversation can increase insight.
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                } else if (dataClientAlign && !dataProviderAlign) {
+                                                    return (
+                                                        <div className="bg-orange-100 border-2 border-orange-400 rounded-xl p-4">
+                                                            <p className="font-bold text-orange-900 mb-2">🤔 Provider Discrepancy (Data + Client Align, Provider Different)</p>
+                                                            <p className="text-sm text-gray-700">
+                                                                Your clinical assessment differs from objective data and client's self-perception. This may indicate:
+                                                            </p>
+                                                            <ul className="text-sm text-gray-700 mt-2 ml-4 space-y-1">
+                                                                <li>• You're identifying underlying root cause vs. symptoms</li>
+                                                                <li>• Clinical observations revealing deeper patterns</li>
+                                                                <li>• Family/contextual factors not captured in assessment</li>
+                                                                <li>• Comorbid conditions influencing presentation</li>
+                                                            </ul>
+                                                            <p className="text-sm font-semibold text-orange-900 mt-3">
+                                                                💡 Consider: Your clinical judgment adds valuable context. Document your reasoning for prioritizing this barrier.
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                } else {
+                                                    return (
+                                                        <div className="bg-red-100 border-2 border-red-400 rounded-xl p-4">
+                                                            <p className="font-bold text-red-900 mb-2">❗ Significant Discrepancy (All Three Different)</p>
+                                                            <p className="text-sm text-gray-700">
+                                                                All three perspectives identify different primary barriers. This complexity requires careful attention:
+                                                            </p>
+                                                            <ul className="text-sm text-gray-700 mt-2 ml-4 space-y-1">
+                                                                <li>• Multiple significant barriers may be present</li>
+                                                                <li>• Client may be overwhelmed or confused</li>
+                                                                <li>• Assessment responses may need validation</li>
+                                                                <li>• Requires deeper clinical exploration</li>
+                                                                <li>• Consider interdisciplinary consultation</li>
+                                                            </ul>
+                                                            <p className="text-sm font-semibold text-red-900 mt-3">
+                                                                💡 Recommendation: Schedule extended assessment session. Explore each perspective. May benefit from starting with client's perceived barrier to build rapport and buy-in.
+                                                            </p>
+                                                        </div>
+                                                    );
+                                                }
+                                            })()}
+                                            
+                                            <div className="bg-blue-50 border-2 border-blue-300 rounded-xl p-4">
+                                                <p className="font-bold text-blue-900 mb-2">📝 Documentation Note:</p>
+                                                <p className="text-xs text-gray-700 italic">
+                                                    This comparison analysis is for clinical use only and is not included in client materials. Consider documenting the alignment/discrepancy and its implications in your clinical notes.
+                                                </p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Barrier Assessment Results (if available) */}
+                            {barrierResults && (
+                                <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                    <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#00A3E0'}}>
+                                        Wellness Barrier Assessment Results
+                                    </h2>
+                                    
+                                    <div className="mb-6 p-6 bg-blue-50 rounded-2xl border-2" style={{borderColor: '#00A3E0'}}>
+                                        <h3 className="text-xl font-bold mb-2" style={{color: '#00A3E0'}}>
+                                            Primary Barrier: {barrierResults.topBarrier.name}
+                                        </h3>
+                                        <p className="text-gray-700">
+                                            <strong>Average Score:</strong> {barrierResults.topBarrier.average.toFixed(2)} / 4.0
+                                        </p>
+                                        <p className="text-sm text-gray-600 mt-2">
+                                            This area shows the highest barriers and will be prioritized in the wellness plan.
+                                        </p>
+                                    </div>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {barrierResults.barriers.map((barrier, idx) => (
+                                            <div key={idx} className="border-2 rounded-xl p-4" style={{
+                                                borderColor: idx === 0 ? '#FF6B6B' : idx < 3 ? '#F39C12' : '#00A3E0'
+                                            }}>
+                                                <div className="flex justify-between items-start mb-2">
+                                                    <div>
+                                                        <p className="font-bold text-gray-800">{barrier.name}</p>
+                                                        <p className="text-xs text-gray-600">Questions: {barrier.questions.join(', ')}</p>
+                                                    </div>
+                                                    <span className={`text-lg font-bold ${
+                                                        idx === 0 ? 'text-red-600' : idx < 3 ? 'text-orange-600' : 'text-green-600'
+                                                    }`}>
+                                                        #{idx + 1}
+                                                    </span>
+                                                </div>
+                                                <div className="mt-3">
+                                                    <div className="flex justify-between text-sm mb-1">
+                                                        <span className="text-gray-600">Score:</span>
+                                                        <span className="font-bold">{barrier.average.toFixed(2)} / 4.0</span>
+                                                    </div>
+                                                    <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
+                                                        <div 
+                                                            className="h-full" 
+                                                            style={{
+                                                                width: `${(barrier.average / 4) * 100}%`,
+                                                                background: idx === 0 ? '#FF6B6B' : idx < 3 ? '#F39C12' : '#7AC943'
+                                                            }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                    
+                                    <div className="mt-6 bg-yellow-100 border-2 border-yellow-400 rounded-xl p-4">
+                                        <p className="font-bold text-gray-800 mb-2">📊 Score Interpretation:</p>
+                                        <ul className="text-sm text-gray-700 space-y-1">
+                                            <li>• <strong>1.0-1.5:</strong> Low barrier - minimal challenges in this area</li>
+                                            <li>• <strong>1.5-2.5:</strong> Moderate barrier - some challenges present</li>
+                                            <li>• <strong>2.5-3.5:</strong> Significant barrier - notable challenges requiring attention</li>
+                                            <li>• <strong>3.5-4.0:</strong> High barrier - major challenges needing priority focus</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Action Buttons */}
+                            <div className="bg-white rounded-3xl shadow-lg p-6 mb-8 no-print">
+                                <div className="flex flex-wrap gap-4 items-center justify-between">
+                                    <h2 className="text-2xl font-bold" style={{color: '#00A3E0'}}>
+                                        ✅ Plan Generated!
+                                    </h2>
+                                    <div className="flex flex-wrap gap-3">
+                                        <button 
+                                            onClick={printAll}
+                                            className="text-white font-bold py-3 px-6 rounded-xl hover:shadow-xl transition-all hq-primary-btn"
+                                        >
+                                            🖨️ Print Complete Plan
+                                        </button>
+                                        <button 
+                                            onClick={clearAndStartNew}
+                                            className="bg-gray-300 text-gray-700 font-bold py-3 px-6 rounded-xl hover:bg-gray-400 transition-all"
+                                        >
+                                            🆕 New Client
+                                        </button>
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-4 bg-yellow-50 border-2 border-yellow-300 rounded-xl p-4">
+                                    <p className="text-sm font-semibold text-gray-800">
+                                        💡 Review plan with client → Print materials → Give to family → Clear for next client
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* SMART Goals */}
+                            <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#00A3E0'}}>
+                                    6 SMART Goals - 12 Week Journey
+                                </h2>
+                                
+                                <div className="grid md:grid-cols-2 gap-6">
+                                    {generatedPlan.smartGoals.map((goal, idx) => (
+                                        <div key={idx} className="border-4 rounded-2xl p-6" style={{borderColor: '#00A3E0'}}>
+                                            <div className="flex items-start justify-between mb-4">
+                                                <div>
+                                                    <span className="text-3xl">{goal.icon}</span>
+                                                    <h3 className="text-xl font-bold text-gray-800 mt-2">
+                                                        Goal {idx + 1}: {goal.category}
+                                                    </h3>
+                                                    <p className="text-sm font-semibold" style={{color: '#7AC943'}}>
+                                                        Week {goal.week}
+                                                    </p>
+                                                </div>
+                                                <div className="w-8 h-8 border-2 border-gray-400 rounded"></div>
+                                            </div>
+
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 text-sm">SPECIFIC:</p>
+                                                    <p className="text-gray-600 text-sm">{goal.specific}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 text-sm">MEASURABLE:</p>
+                                                    <p className="text-gray-600 text-sm">{goal.measurable}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 text-sm">ACHIEVABLE:</p>
+                                                    <p className="text-gray-600 text-sm">{goal.achievable}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 text-sm">RELEVANT:</p>
+                                                    <p className="text-gray-600 text-sm">{goal.relevant}</p>
+                                                </div>
+                                                <div>
+                                                    <p className="font-semibold text-gray-700 text-sm">TIME-BOUND:</p>
+                                                    <p className="text-gray-600 text-sm">{goal.timeBound}</p>
+                                                </div>
+                                                <div className="pt-3 border-t-2 border-gray-200">
+                                                    <p className="font-semibold text-gray-700 text-xs">📚 Evidence Source:</p>
+                                                    <p className="text-gray-600 text-xs italic">{goal.evidence}</p>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Mountain Tracker */}
+                            <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#00A3E0'}}>
+                                    Wellness Mountain Tracker 🏔️
+                                </h2>
+                                
+                                <svg viewBox="0 0 400 500" className="w-full max-w-2xl mx-auto">
+                                    <path d="M 50 450 L 200 50 L 350 450 Z" fill="#E8F5F9" stroke="#00A3E0" strokeWidth="4"/>
+                                    <path 
+                                        d="M 200 430 Q 180 380, 200 330 Q 220 280, 200 230 Q 180 180, 200 130 Q 220 80, 200 60" 
+                                        fill="none" 
+                                        stroke="#00A3E0" 
+                                        strokeWidth="3" 
+                                        strokeDasharray="5,5"
+                                        className="mountain-path"
+                                    />
+                                    
+                                    {[
+                                        {y: 395, emoji: '⭐', label: 'Week 2'},
+                                        {y: 340, emoji: '💪', label: 'Week 4'},
+                                        {y: 285, emoji: '🌈', label: 'Week 6'},
+                                        {y: 230, emoji: '🚀', label: 'Week 8'},
+                                        {y: 175, emoji: '🌟', label: 'Week 10'},
+                                        {y: 120, emoji: '👑', label: 'Week 12'}
+                                    ].map((checkpoint, idx) => (
+                                        <g key={idx}>
+                                            <circle cx="200" cy={checkpoint.y} r="18" fill="white" stroke="#00A3E0" strokeWidth="3"/>
+                                            <text x="200" y={checkpoint.y + 6} textAnchor="middle" fontSize="20">{checkpoint.emoji}</text>
+                                            <text 
+                                                x={idx % 2 === 0 ? "120" : "280"} 
+                                                y={checkpoint.y + 5} 
+                                                textAnchor={idx % 2 === 0 ? "end" : "start"}
+                                                fontSize="14"
+                                                fontWeight="600"
+                                            >
+                                                {checkpoint.label}
+                                            </text>
+                                        </g>
+                                    ))}
+                                    
+                                    <circle cx="200" cy="50" r="22" fill="#F39C12" stroke="#fff" strokeWidth="3"/>
+                                    <text x="200" y="62" textAnchor="middle" fontSize="28">🏆</text>
+                                    
+                                    <circle cx="200" cy="430" r="22" fill="#00A3E0" stroke="#fff" strokeWidth="3"/>
+                                    <text x="200" y="442" textAnchor="middle" fontSize="28">🎯</text>
+                                </svg>
+                                
+                                <div className="text-center mt-6">
+                                    <p className="font-bold text-lg" style={{color: '#00A3E0'}}>
+                                        Color in each checkpoint as you complete your goals!
+                                    </p>
+                                    <p className="text-gray-600 mt-2">
+                                        Every step up this mountain is a victory - keep climbing! 🌟
+                                    </p>
+                                </div>
+                            </div>
+
+                            {/* Weekly Calendar */}
+                            <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#00A3E0'}}>
+                                    12-Week Activity Calendar
+                                </h2>
+                                
+                                <div className="space-y-6">
+                                    {generatedPlan.weeklyCalendar.map((week, idx) => (
+                                        <div key={idx} className="border-4 rounded-xl p-4" style={{borderColor: idx === 0 ? '#00A3E0' : '#e5e7eb'}}>
+                                            <div className="flex justify-between items-start mb-3">
+                                                <div>
+                                                    <h3 className="text-xl font-bold text-gray-800">Week {week.weekNumber}</h3>
+                                                    <p className="text-sm font-semibold" style={{color: '#7AC943'}}>{week.theme}</p>
+                                                </div>
+                                                <div className="flex space-x-2">
+                                                    {week.sessions.map((_, i) => (
+                                                        <div key={i} className="w-6 h-6 border-2 border-gray-400 rounded"></div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                            <div className="bg-yellow-100 border-2 border-yellow-400 rounded-lg p-2">
+                                                <p className="text-xs font-semibold text-gray-800">{week.booster}</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+
+                            {/* Nutrition Challenges */}
+                            {generatedPlan.nutritionChallenges.length > 0 && (
+                                <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                    <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#7AC943'}}>
+                                        🥗 Weekly Nutrition Challenges
+                                    </h2>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {generatedPlan.nutritionChallenges.map((challenge, idx) => (
+                                            <div key={idx} className="border-2 rounded-xl p-4" style={{borderColor: '#7AC943'}}>
+                                                <div className="flex items-start space-x-3">
+                                                    <span className="text-3xl">{challenge.icon}</span>
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <p className="font-bold text-gray-800">Week {challenge.week}</p>
+                                                                <p className="text-sm font-semibold" style={{color: '#7AC943'}}>{challenge.challenge}</p>
+                                                            </div>
+                                                            <div className="w-6 h-6 border-2 border-gray-400 rounded"></div>
+                                                        </div>
+                                                        <p className="text-xs text-gray-600 mt-2">{challenge.description}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Emotional Wellness Activities */}
+                            {generatedPlan.emotionalActivities.length > 0 && (
+                                <div className="bg-white rounded-3xl shadow-lg p-8 mb-8 print-page-break">
+                                    <h2 className="text-3xl font-bold mb-6 text-center" style={{color: '#9B59B6'}}>
+                                        🧠 Weekly Emotional Wellness Activities
+                                    </h2>
+                                    
+                                    <div className="grid md:grid-cols-2 gap-4">
+                                        {generatedPlan.emotionalActivities.map((activity, idx) => (
+                                            <div key={idx} className="border-2 rounded-xl p-4" style={{borderColor: '#9B59B6'}}>
+                                                <div className="flex items-start space-x-3">
+                                                    <span className="text-3xl">{activity.icon}</span>
+                                                    <div className="flex-1">
+                                                        <div className="flex justify-between items-start">
+                                                            <div>
+                                                                <p className="font-bold text-gray-800">Week {activity.week}</p>
+                                                                <p className="text-sm font-semibold" style={{color: '#9B59B6'}}>{activity.activity}</p>
+                                                            </div>
+                                                            <div className="w-6 h-6 border-2 border-gray-400 rounded"></div>
+                                                        </div>
+                                                        <p className="text-xs text-gray-600 mt-2">{activity.description}</p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            )}
+
+                            {/* Evidence-Based Resources */}
+                            <div className="bg-gradient-to-r from-blue-100 to-green-100 rounded-3xl p-8 print-page-break">
+                                <h2 className="text-2xl font-bold text-gray-800 mb-4 text-center">
+                                    📚 Evidence-Based Guidelines Used
+                                </h2>
+                                
+                                <div className="grid md:grid-cols-2 gap-4">
+                                    <div className="bg-white rounded-xl p-4">
+                                        <h3 className="font-bold text-sm mb-2" style={{color: '#00A3E0'}}>Physical Activity</h3>
+                                        <ul className="text-xs text-gray-700 space-y-1">
+                                            <li>• CDC Physical Activity Guidelines</li>
+                                            <li>• AAP Healthy Active Living</li>
+                                            <li>• WHO Youth Recommendations</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-xl p-4">
+                                        <h3 className="font-bold text-sm mb-2" style={{color: '#7AC943'}}>Nutrition</h3>
+                                        <ul className="text-xs text-gray-700 space-y-1">
+                                            <li>• MyPlate.gov (USDA)</li>
+                                            <li>• Academy of Nutrition & Dietetics</li>
+                                            <li>• NASPGHAN Pediatric Guidelines</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-xl p-4">
+                                        <h3 className="font-bold text-sm mb-2" style={{color: '#9B59B6'}}>Mental Health</h3>
+                                        <ul className="text-xs text-gray-700 space-y-1">
+                                            <li>• AAP Mental Health Initiatives</li>
+                                            <li>• NAMI Youth Resources</li>
+                                            <li>• CDC Mental Health Guidelines</li>
+                                            <li>• NEDA Body Image Resources</li>
+                                        </ul>
+                                    </div>
+                                    
+                                    <div className="bg-white rounded-xl p-4">
+                                        <h3 className="font-bold text-sm mb-2" style={{color: '#F39C12'}}>Sleep Health</h3>
+                                        <ul className="text-xs text-gray-700 space-y-1">
+                                            <li>• AAP Sleep Guidelines</li>
+                                            <li>• National Sleep Foundation</li>
+                                            <li>• CDC Sleep Recommendations</li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-6 bg-red-50 border-2 border-red-300 rounded-xl p-4">
+                                    <h3 className="font-bold text-sm text-red-900 mb-2">🚨 When to Seek Professional Help</h3>
+                                    <ul className="text-xs text-gray-700 space-y-1">
+                                        <li>• Persistent physical pain during activity</li>
+                                        <li>• Extreme anxiety interfering with daily life</li>
+                                        <li>• Disordered eating or body image concerns</li>
+                                        <li>• Thoughts of self-harm</li>
+                                        <li>• Significant sleep disturbances (2+ weeks)</li>
+                                    </ul>
+                                </div>
+                                
+                                <div className="mt-4 bg-white rounded-xl p-4">
+                                    <h3 className="font-bold text-sm text-gray-800 mb-2">📞 Crisis Resources</h3>
+                                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-700">
+                                        <div><strong>Crisis Text Line:</strong> Text HOME to 741741</div>
+                                        <div><strong>Suicide Prevention:</strong> 988</div>
+                                        <div><strong>Teen Line:</strong> 1-800-852-8336</div>
+                                        <div><strong>NEDA Helpline:</strong> 1-800-931-2237</div>
+                                    </div>
+                                </div>
+                                
+                                <div className="mt-4 text-center">
+                                    <p className="text-xs text-gray-600">
+                                        <strong>ABCD & Metabolic Health Clinic</strong><br/>
+                                        www.discoverhealthquest.com
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                );
+            };
+
+            return (
+                <div>
+                    {view === 'home' && <HomeView />}
+                    {view === 'assessment' && <AssessmentView />}
+                    {view === 'intake' && <IntakeView />}
+                    {view === 'plan' && <PlanView />}
+                </div>
+            );
+        }
+
+        ReactDOM.render(<ProviderWellnessTool />, document.getElementById('root'));
+    </script>
+</body>
+</html>
