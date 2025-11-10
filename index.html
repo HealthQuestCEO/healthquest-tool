@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HealthQuest Provider Dashboard</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Poppins', sans-serif;
+            background: linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%);
+            min-height: 100vh;
+        }
+        
+        /* Header */
+        .header {
+            background: white;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            padding: 20px 40px;
+        }
+        
+        .header-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .logo {
+            font-size: 28px;
+            font-weight: bold;
+            color: #00A3E0;
+        }
+        
+        .logo-subtitle {
+            font-size: 12px;
+            color: #666;
+            font-weight: normal;
+        }
+        
+        /* Tab Navigation */
+        .tab-nav {
+            background: white;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            padding: 0 40px;
+        }
+        
+        .tab-nav-content {
+            max-width: 1400px;
+            margin: 0 auto;
+            display: flex;
+            gap: 0;
+        }
+        
+        .tab-button {
+            background: none;
+            border: none;
+            padding: 20px 30px;
+            font-family: 'Poppins', sans-serif;
+            font-size: 16px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+            position: relative;
+        }
+        
+        .tab-button:hover {
+            color: #00A3E0;
+            background: #f8f9fa;
+        }
+        
+        .tab-button.active {
+            color: #00A3E0;
+            border-bottom-color: #00A3E0;
+            background: #f8f9fa;
+        }
+        
+        .tab-icon {
+            font-size: 20px;
+            margin-right: 8px;
+        }
+        
+        /* Tab Content */
+        .tab-content {
+            display: none;
+            padding: 0;
+            animation: fadeIn 0.3s;
+        }
+        
+        .tab-content.active {
+            display: block;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        
+        /* iframe styling */
+        .tool-frame {
+            width: 100%;
+            border: none;
+            min-height: calc(100vh - 140px);
+            background: white;
+        }
+        
+        /* Welcome screen */
+        .welcome {
+            max-width: 1200px;
+            margin: 40px auto;
+            padding: 60px 40px;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+            text-align: center;
+        }
+        
+        .welcome h1 {
+            font-size: 48px;
+            color: #00A3E0;
+            margin-bottom: 20px;
+        }
+        
+        .welcome p {
+            font-size: 20px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .tool-cards {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .tool-card {
+            background: linear-gradient(135deg, #E8F5F9 0%, #F1F9E8 100%);
+            padding: 30px;
+            border-radius: 15px;
+            text-align: center;
+            cursor: pointer;
+            transition: transform 0.3s, box-shadow 0.3s;
+            border: 2px solid transparent;
+        }
+        
+        .tool-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 8px 25px rgba(0,163,224,0.3);
+            border-color: #00A3E0;
+        }
+        
+        .tool-card-icon {
+            font-size: 64px;
+            margin-bottom: 15px;
+        }
+        
+        .tool-card h3 {
+            font-size: 22px;
+            color: #00A3E0;
+            margin-bottom: 10px;
+        }
+        
+        .tool-card p {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        /* Mobile responsive */
+        @media (max-width: 768px) {
+            .header-content {
+                flex-direction: column;
+                gap: 10px;
+            }
+            
+            .tab-nav {
+                padding: 0 20px;
+                overflow-x: auto;
+            }
+            
+            .tab-nav-content {
+                min-width: max-content;
+            }
+            
+            .tab-button {
+                padding: 15px 20px;
+                font-size: 14px;
+            }
+            
+            .welcome {
+                padding: 40px 20px;
+            }
+            
+            .welcome h1 {
+                font-size: 32px;
+            }
+            
+            .tool-cards {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <!-- Header -->
+    <div class="header">
+        <div class="header-content">
+            <div>
+                <div class="logo">🏔️ HealthQuest Provider Dashboard</div>
+                <div class="logo-subtitle">Comprehensive Pediatric Wellness Tools</div>
+            </div>
+            <div style="color: #666; font-size: 14px;">
+                <span id="currentDate"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab Navigation -->
+    <div class="tab-nav">
+        <div class="tab-nav-content">
+            <button class="tab-button active" onclick="switchTab('welcome')">
+                <span class="tab-icon">🏠</span>
+                Home
+            </button>
+            <button class="tab-button" onclick="switchTab('wellness')">
+                <span class="tab-icon">📊</span>
+                Wellness Assessment
+            </button>
+            <button class="tab-button" onclick="switchTab('workout')">
+                <span class="tab-icon">🏋️</span>
+                Workout Builder
+            </button>
+            <button class="tab-button" onclick="switchTab('analytics')">
+                <span class="tab-icon">📈</span>
+                Analytics
+            </button>
+        </div>
+    </div>
+
+    <!-- Tab Contents -->
+    <div id="welcome" class="tab-content active">
+        <div class="welcome">
+            <h1>Welcome to HealthQuest Provider Tools</h1>
+            <p>Everything you need to create personalized wellness plans for your pediatric clients</p>
+            
+            <div class="tool-cards">
+                <div class="tool-card" onclick="switchTab('wellness')">
+                    <div class="tool-card-icon">📊</div>
+                    <h3>Wellness Assessment</h3>
+                    <p>12-question barrier assessment with three-way comparison (client, provider, data). Auto-generates SMART goals and 12-week plans.</p>
+                </div>
+                
+                <div class="tool-card" onclick="switchTab('workout')">
+                    <div class="tool-card-icon">🏋️</div>
+                    <h3>Workout Builder</h3>
+                    <p>Evidence-based exercise plans by age (5-18). Considers limitations, interests, and activity level. Generates 12-week progressive programs.</p>
+                </div>
+                
+                <div class="tool-card" onclick="switchTab('analytics')">
+                    <div class="tool-card-icon">📈</div>
+                    <h3>Analytics Dashboard</h3>
+                    <p>Upload exported assessment data to see population trends, barrier patterns, and alignment analysis. HIPAA-compliant research insights.</p>
+                </div>
+            </div>
+
+            <div style="margin-top: 60px; padding-top: 40px; border-top: 2px solid #eee;">
+                <h3 style="color: #00A3E0; margin-bottom: 20px;">Quick Start Guide</h3>
+                <div style="text-align: left; max-width: 600px; margin: 0 auto;">
+                    <p style="margin-bottom: 15px; color: #666;">
+                        <strong>1. Wellness Assessment:</strong> Complete with client to identify barriers, then generate personalized plan
+                    </p>
+                    <p style="margin-bottom: 15px; color: #666;">
+                        <strong>2. Workout Builder:</strong> Create age-appropriate exercise programs based on abilities and interests
+                    </p>
+                    <p style="margin-bottom: 15px; color: #666;">
+                        <strong>3. Analytics:</strong> Track trends across your client population (requires exported data)
+                    </p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="wellness" class="tab-content">
+        <iframe 
+            class="tool-frame" 
+            src="./wellness-tool.html"
+            title="Wellness Assessment Tool"
+        ></iframe>
+    </div>
+
+    <div id="workout" class="tab-content">
+        <iframe 
+            class="tool-frame" 
+            src="./workout-builder.html"
+            title="Workout Builder"
+        ></iframe>
+    </div>
+
+    <div id="analytics" class="tab-content">
+        <iframe 
+            class="tool-frame" 
+            src="./dashboard.html"
+            title="Analytics Dashboard"
+        ></iframe>
+    </div>
+
+    <script>
+        // Set current date
+        const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' };
+        document.getElementById('currentDate').textContent = new Date().toLocaleDateString('en-US', options);
+
+        // Tab switching function
+        function switchTab(tabName) {
+            // Hide all tab contents
+            const contents = document.querySelectorAll('.tab-content');
+            contents.forEach(content => content.classList.remove('active'));
+            
+            // Remove active class from all buttons
+            const buttons = document.querySelectorAll('.tab-button');
+            buttons.forEach(button => button.classList.remove('active'));
+            
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+            
+            // Add active class to clicked button
+            const activeButton = Array.from(buttons).find(button => {
+                const text = button.textContent.trim().toLowerCase();
+                if (tabName === 'welcome') return text.includes('home');
+                if (tabName === 'wellness') return text.includes('wellness');
+                if (tabName === 'workout') return text.includes('workout');
+                if (tabName === 'analytics') return text.includes('analytics');
+                return false;
+            });
+            if (activeButton) activeButton.classList.add('active');
+            
+            // Scroll to top
+            window.scrollTo(0, 0);
+        }
+    </script>
+</body>
+</html>
